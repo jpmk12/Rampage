@@ -11,36 +11,45 @@ import {
   LEVEL,
   COLORS,
 } from '../config.js';
+import { Player } from '../state/PlayerState.js';
+import { getWeapon } from '../data/catalog.js';
+import { buildCar } from '../entities/Car.js';
 
-// Milestone 1: goblins run in, your shots destroy them with a poof, defeated
-// goblins drop Scrap that auto-collects into a counter, and a finish flag
-// rolls in to end the level.
+// The action level: goblins, shooting, scrap, and the finish flag. On
+// completion it hands off to the Garage (Milestone 2) carrying the run's
+// earnings. The car is built from the player's equipped loadout, so upgrades
+// bought in the Garage show up here both visually and in the weapon stats.
 export default class GameScene extends Phaser.Scene {
   constructor() {
     super('Game');
   }
 
   create() {
+    const profile = Player.state;
+    this.level = profile.level;
+    this.weapon = getWeapon(profile.weapon);
+    this.levelStartScrap = profile.scrap;
+
     this.state = 'playing';
-    this.distance = 0; // world distance covered this level
-    this.scrap = 0;
+    this.distance = 0;
     this.flagSpawned = false;
     this.flag = null;
 
+    // a touch more pressure each level so upgrades pay off
+    this.spawnGap = Math.max(450, ENEMY.spawnEveryMin - (this.level - 1) * 80);
+
     this.buildBackground();
-    this.buildCar();
+    this.buildCar(profile);
     this.buildGroups();
     this.buildInput();
     this.buildHud();
-    this.scheduleNextSpawn(this.time.now + ENEMY.firstSpawnDelay);
+    this.nextSpawnAt = this.time.now + ENEMY.firstSpawnDelay;
 
-    // bullet → goblin hits
     this.physics.add.overlap(this.bullets, this.goblins, this.onBulletHit, null, this);
   }
 
   buildBackground() {
     this.add.image(0, 0, 'sky').setOrigin(0, 0).setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
-
     this.farHills = this.add
       .tileSprite(0, GROUND_TOP_Y - 150, GAME_WIDTH, 150, 'hills-far')
       .setOrigin(0, 0);
@@ -52,9 +61,9 @@ export default class GameScene extends Phaser.Scene {
       .setOrigin(0, 0);
   }
 
-  buildCar() {
-    this.car = this.add.image(CAR.x, CAR.startY, 'car');
-    this.car.setOrigin(0.5, 1).setDepth(5);
+  buildCar(profile) {
+    this.car = buildCar(this, CAR.x, CAR.startY, profile.body, profile.weapon);
+    this.car.setDepth(5);
     this.carTargetY = CAR.startY;
     this.usePointerSteering = false;
   }
@@ -68,15 +77,12 @@ export default class GameScene extends Phaser.Scene {
 
   buildInput() {
     this.cursors = this.input.keyboard.createCursorKeys();
-    this.keys = this.input.keyboard.addKeys('W,S,R');
+    this.keys = this.input.keyboard.addKeys('W,S');
     this.fireKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
     this.pointerHeld = false;
     this.input.on('pointerdown', (p) => {
-      if (this.state === 'complete') {
-        this.scene.restart();
-        return;
-      }
+      if (this.state !== 'playing') return;
       this.pointerHeld = true;
       this.usePointerSteering = true;
       this.carTargetY = p.y;
@@ -97,22 +103,20 @@ export default class GameScene extends Phaser.Scene {
       stroke: '#1b1d2a',
       strokeThickness: 4,
     };
-    this.add.text(16, 12, 'RAMPAGE — Level 1', { ...style, fontSize: '24px' }).setDepth(20);
+    this.add.text(16, 12, `RAMPAGE — Level ${this.level}`, { ...style, fontSize: '24px' }).setDepth(20);
     this.add
-      .text(16, 44, 'Move: ↑/↓ or W/S (or drag)    Fire: Space (or tap/hold)', {
+      .text(16, 44, `Weapon: ${this.weapon.name}    Fire: Space / tap`, {
         ...style,
         fontSize: '15px',
         color: '#ffe9b0',
       })
       .setDepth(20);
 
-    // scrap counter (top-right)
     this.add.image(GAME_WIDTH - 120, 26, 'scrap').setScale(1.1).setDepth(20);
     this.scrapText = this.add
-      .text(GAME_WIDTH - 104, 14, '0', { ...style, fontSize: '26px' })
+      .text(GAME_WIDTH - 104, 14, String(Player.state.scrap), { ...style, fontSize: '26px' })
       .setDepth(20);
 
-    // progress bar toward the finish flag
     this.progressBg = this.add
       .rectangle(GAME_WIDTH / 2, 24, 260, 12, 0x1b1d2a, 0.55)
       .setDepth(20);
@@ -120,10 +124,7 @@ export default class GameScene extends Phaser.Scene {
       .rectangle(GAME_WIDTH / 2 - 128, 24, 4, 8, 0x6fd06a, 1)
       .setOrigin(0, 0.5)
       .setDepth(20);
-    this.add
-      .image(GAME_WIDTH / 2 + 132, 24, 'flag')
-      .setScale(0.18)
-      .setDepth(20);
+    this.add.image(GAME_WIDTH / 2 + 132, 24, 'flag').setScale(0.18).setDepth(20);
   }
 
   update(time, delta) {
@@ -131,14 +132,13 @@ export default class GameScene extends Phaser.Scene {
       this.scrollWorld(delta);
       this.advanceLevel(delta);
       this.maybeSpawnGoblin(time);
+      this.handleFiring(time);
     }
     this.steerCar(delta);
-    if (this.state === 'playing') this.handleFiring(time);
     this.updateGoblins();
     this.updateScraps(delta);
     this.updateFlag(delta);
     this.cullBullets();
-    this.handleRestartKey();
   }
 
   scrollWorld(delta) {
@@ -151,10 +151,7 @@ export default class GameScene extends Phaser.Scene {
     this.distance += WORLD_SCROLL * delta;
     const p = Phaser.Math.Clamp(this.distance / LEVEL.length, 0, 1);
     this.progressFill.width = 4 + p * 252;
-
-    if (!this.flagSpawned && this.distance >= LEVEL.length) {
-      this.spawnFlag();
-    }
+    if (!this.flagSpawned && this.distance >= LEVEL.length) this.spawnFlag();
   }
 
   steerCar(delta) {
@@ -176,35 +173,26 @@ export default class GameScene extends Phaser.Scene {
 
   // ---- enemies ----------------------------------------------------------
 
-  scheduleNextSpawn(at) {
-    this.nextSpawnAt = at;
-  }
-
   maybeSpawnGoblin(time) {
-    // stop sending new goblins once the finish flag is on its way
-    if (this.distance >= LEVEL.length) return;
+    if (this.distance >= LEVEL.length) return; // flag is inbound
     if (time < this.nextSpawnAt) return;
 
-    const y = GROUND_TOP_Y + 2;
-    const goblin = this.goblins.create(GAME_WIDTH + 50, y, 'goblin');
+    const goblin = this.goblins.create(GAME_WIDTH + 50, GROUND_TOP_Y + 2, 'goblin');
     goblin.setOrigin(0.5, 1);
     goblin.body.setAllowGravity(false);
     goblin.setVelocityX(-ENEMY.goblinSpeed);
     goblin.setData('hp', ENEMY.goblinHp);
-    // a little run bob
     goblin.setData('bobSeed', Math.random() * Math.PI * 2);
 
-    const gap = Phaser.Math.Between(ENEMY.spawnEveryMin, ENEMY.spawnEveryMax);
-    this.scheduleNextSpawn(time + gap);
+    const gap = Phaser.Math.Between(this.spawnGap, this.spawnGap + 850);
+    this.nextSpawnAt = time + gap;
   }
 
   updateGoblins() {
     this.goblins.children.iterate((g) => {
       if (!g) return true;
-      // bobbing run
       const t = this.time.now * 0.018 + g.getData('bobSeed');
       g.rotation = Math.sin(t) * 0.08;
-      // got past the car
       if (g.x < -60) {
         g.destroy();
         if (this.state === 'playing') this.cameras.main.shake(120, 0.004);
@@ -215,7 +203,7 @@ export default class GameScene extends Phaser.Scene {
 
   onBulletHit(bullet, goblin) {
     bullet.destroy();
-    const hp = goblin.getData('hp') - 1;
+    const hp = goblin.getData('hp') - this.weapon.damage;
     if (hp > 0) {
       goblin.setData('hp', hp);
       goblin.setTintFill(0xffffff);
@@ -226,10 +214,8 @@ export default class GameScene extends Phaser.Scene {
   }
 
   defeatGoblin(goblin) {
-    const x = goblin.x;
-    const y = goblin.y - 28;
-    this.poof(x, y, COLORS.goblin);
-    this.spawnScrap(x, y);
+    this.poof(goblin.x, goblin.y - 28, COLORS.goblin);
+    this.spawnScrap(goblin.x, goblin.y - 28);
     goblin.destroy();
   }
 
@@ -256,7 +242,7 @@ export default class GameScene extends Phaser.Scene {
   spawnScrap(x, y) {
     const s = this.scraps.create(x, y, 'scrap');
     s.setDepth(4);
-    s.setData('vy', -0.18 - Math.random() * 0.12); // little pop upward
+    s.setData('vy', -0.18 - Math.random() * 0.12);
   }
 
   updateScraps(delta) {
@@ -264,23 +250,20 @@ export default class GameScene extends Phaser.Scene {
     const cy = this.car.y - 30;
     this.scraps.children.iterate((s) => {
       if (!s) return true;
-
       const dist = Phaser.Math.Distance.Between(s.x, s.y, cx, cy);
+
       if (dist < SCRAP.collectRange) {
         this.collectScrap(s);
         return true;
       }
-
       if (dist < SCRAP.magnetRange) {
-        // home toward the car (forgiving auto-collect for little hands)
         const k = Math.min(1, SCRAP.homeLerp * delta);
         s.x += (cx - s.x) * k;
         s.y += (cy - s.y) * k;
       } else {
-        // drift left with the world and settle on the ground
         s.x -= WORLD_SCROLL * delta;
         let vy = s.getData('vy');
-        vy += 0.0016 * delta; // gravity
+        vy += 0.0016 * delta;
         s.y += vy * delta;
         s.setData('vy', vy);
         const floor = GROUND_TOP_Y - 6;
@@ -289,7 +272,6 @@ export default class GameScene extends Phaser.Scene {
           s.setData('vy', 0);
         }
       }
-
       s.rotation += 0.004 * delta;
       if (s.x < -40) s.destroy();
       return true;
@@ -298,8 +280,10 @@ export default class GameScene extends Phaser.Scene {
 
   collectScrap(s) {
     s.destroy();
-    this.scrap += SCRAP.value;
-    this.scrapText.setText(String(this.scrap));
+    // mutate in-memory total now; persist once at level end (avoids spamming
+    // localStorage on every pickup)
+    Player.state.scrap += SCRAP.value;
+    this.scrapText.setText(String(Player.state.scrap));
     this.tweens.add({
       targets: this.scrapText,
       scale: { from: 1.35, to: 1 },
@@ -319,9 +303,7 @@ export default class GameScene extends Phaser.Scene {
   updateFlag(delta) {
     if (!this.flag || this.state !== 'playing') return;
     this.flag.x -= WORLD_SCROLL * delta;
-    if (this.flag.x <= this.car.x) {
-      this.completeLevel();
-    }
+    if (this.flag.x <= this.car.x) this.completeLevel();
   }
 
   completeLevel() {
@@ -334,38 +316,34 @@ export default class GameScene extends Phaser.Scene {
 
     const cx = GAME_WIDTH / 2;
     const cy = GAME_HEIGHT / 2;
-    this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x1b1d2a, 0.55).setDepth(30);
-    const panel = this.add.rectangle(cx, cy, 520, 240, 0x2a2d3f, 0.96).setDepth(31);
-    panel.setStrokeStyle(4, 0xffe9b0);
-
-    const big = {
-      fontFamily: 'system-ui, sans-serif',
-      color: '#ffffff',
-      stroke: '#1b1d2a',
-      strokeThickness: 5,
-      align: 'center',
-    };
+    this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x1b1d2a, 0.4).setDepth(30);
     this.add
-      .text(cx, cy - 70, 'LEVEL COMPLETE!', { ...big, fontSize: '40px', color: '#ffe14d' })
-      .setOrigin(0.5)
-      .setDepth(32);
-    this.add
-      .text(cx, cy - 8, `Scrap collected: ${this.scrap}`, { ...big, fontSize: '26px' })
-      .setOrigin(0.5)
-      .setDepth(32);
-    this.add
-      .text(cx, cy + 60, 'Press R or tap to play again', {
-        ...big,
-        fontSize: '20px',
-        color: '#bfe6ff',
+      .text(cx, cy - 20, 'LEVEL COMPLETE!', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '48px',
+        color: '#ffe14d',
+        stroke: '#1b1d2a',
+        strokeThickness: 6,
       })
       .setOrigin(0.5)
       .setDepth(32);
-
-    // a little confetti
-    for (let i = 0; i < 26; i++) {
-      this.time.delayedCall(i * 24, () => this.confettiBit(cx, cy - 120));
+    this.add
+      .text(cx, cy + 34, 'Rolling into the Garage…', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '22px',
+        color: '#ffffff',
+        stroke: '#1b1d2a',
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5)
+      .setDepth(32);
+    for (let i = 0; i < 24; i++) {
+      this.time.delayedCall(i * 26, () => this.confettiBit(cx, cy - 140));
     }
+
+    const earned = Player.state.scrap - this.levelStartScrap;
+    Player.save();
+    this.time.delayedCall(1700, () => this.scene.start('Garage', { earned }));
   }
 
   confettiBit(x, y) {
@@ -380,7 +358,7 @@ export default class GameScene extends Phaser.Scene {
       y: y + 260 + Math.random() * 80,
       angle: bit.angle + Phaser.Math.Between(-180, 180),
       alpha: { from: 1, to: 0.2 },
-      duration: 1400 + Math.random() * 600,
+      duration: 1500,
       ease: 'Quad.easeIn',
       onComplete: () => bit.destroy(),
     });
@@ -391,15 +369,17 @@ export default class GameScene extends Phaser.Scene {
   handleFiring(time) {
     const wantsToFire = this.fireKey.isDown || this.pointerHeld;
     if (!wantsToFire) return;
-    if (time - this.lastFireAt < CAR.fireCooldown) return;
+    if (time - this.lastFireAt < this.weapon.cooldown) return;
 
     this.lastFireAt = time;
-    const muzzleX = this.car.x + 56;
-    const muzzleY = this.car.y - 44;
+    const muzzle = this.car.getData('muzzle');
+    const mx = this.car.x + muzzle.x;
+    const my = this.car.y + muzzle.y;
 
-    const bullet = this.bullets.create(muzzleX, muzzleY, 'bullet');
-    bullet.body.setAllowGravity(false);
-    bullet.setVelocityX(CAR.bulletSpeed);
+    const shot = this.bullets.create(mx, my, this.weapon.shot);
+    shot.setScale(this.weapon.shotScale || 1);
+    shot.body.setAllowGravity(false);
+    shot.setVelocityX(this.weapon.speed);
 
     this.tweens.add({
       targets: this.car,
@@ -414,11 +394,5 @@ export default class GameScene extends Phaser.Scene {
       if (b && b.x > GAME_WIDTH + 40) b.destroy();
       return true;
     });
-  }
-
-  handleRestartKey() {
-    if (this.state === 'complete' && Phaser.Input.Keyboard.JustDown(this.keys.R)) {
-      this.scene.restart();
-    }
   }
 }

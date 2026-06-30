@@ -13,12 +13,28 @@ export default class BootScene extends Phaser.Scene {
     this.makeHill('hills-far', 360, 150, COLORS.farHills, 0.55);
     this.makeHill('hills-near', 300, 210, COLORS.nearHills, 0.7);
     this.makeGround('ground', 256, 90);
-    this.makeCar('car');
-    this.makeBullet('bullet');
+
+    // car bodies (progressively cooler)
+    this.makeBodyCardboard('body-cardboard');
+    this.makeBodyWood('body-wood');
+    this.makeBodyIron('body-iron');
+
+    // weapon icons that mount on the car
+    this.makeWeaponBow('wpn-bow');
+    this.makeWeaponCrossbow('wpn-crossbow');
+    this.makeWeaponCatapult('wpn-catapult');
+
+    // projectiles
+    this.makeShotBow('shot-bow');
+    this.makeShotCrossbow('shot-crossbow');
+    this.makeShotCatapult('shot-catapult');
+
+    // enemies & fx
     this.makeGoblin('goblin');
     this.makeScrap('scrap');
     this.makeFlag('flag');
     this.makePuff('puff');
+    this.makeBolt('bolt');
 
     this.scene.start('Game');
   }
@@ -83,46 +99,169 @@ export default class BootScene extends Phaser.Scene {
     g.destroy();
   }
 
-  // The starter "Cardboard Cart": a wobbly box on two wheels with a little
-  // launcher barrel and a flag. Drawn into a 120x86 texture.
-  makeCar(key) {
-    const W = 120;
-    const H = 86;
-    const g = this.add.graphics();
-
-    // wheels first (behind the body)
+  // All bodies share a 124x92 canvas with the wheels at the bottom, so they
+  // line up on the ground and the weapon mount points stay consistent.
+  drawWheels(g, leftX, rightX, radius, hubColor) {
     g.fillStyle(COLORS.wheel, 1);
-    g.fillCircle(34, 70, 16);
-    g.fillCircle(92, 70, 16);
-    g.fillStyle(0x55555f, 1);
-    g.fillCircle(34, 70, 6);
-    g.fillCircle(92, 70, 6);
+    g.fillCircle(leftX, 78, radius);
+    g.fillCircle(rightX, 78, radius);
+    g.fillStyle(hubColor, 1);
+    g.fillCircle(leftX, 78, radius * 0.38);
+    g.fillCircle(rightX, 78, radius * 0.38);
+  }
 
-    // cardboard body
-    g.fillStyle(COLORS.cardboard, 1);
-    g.fillRoundedRect(14, 30, 92, 34, 6);
-    // tape / fold lines
-    g.lineStyle(3, COLORS.cardboardDark, 1);
-    g.strokeRoundedRect(14, 30, 92, 34, 6);
-    g.beginPath();
-    g.moveTo(60, 30);
-    g.lineTo(60, 64);
-    g.strokePath();
-
-    // launcher barrel pointing right
-    g.fillStyle(COLORS.cardboardDark, 1);
-    g.fillRoundedRect(96, 36, 22, 12, 3);
-
-    // flag pole + flag
+  drawFlag(g, baseX, topY, color) {
     g.lineStyle(3, 0x6b4f2a, 1);
     g.beginPath();
-    g.moveTo(24, 30);
-    g.lineTo(24, 8);
+    g.moveTo(baseX, topY + 22);
+    g.lineTo(baseX, topY);
     g.strokePath();
-    g.fillStyle(0xe2483a, 1);
-    g.fillTriangle(24, 8, 24, 22, 46, 15);
+    g.fillStyle(color, 1);
+    g.fillTriangle(baseX, topY, baseX, topY + 14, baseX + 22, topY + 7);
+  }
 
-    g.generateTexture(key, W, H);
+  // Tier 1 — wobbly cardboard box on two wheels with a red flag.
+  makeBodyCardboard(key) {
+    const g = this.add.graphics();
+    this.drawWheels(g, 36, 92, 15, 0x55555f);
+    g.fillStyle(COLORS.cardboard, 1);
+    g.fillRoundedRect(16, 38, 92, 36, 6);
+    g.lineStyle(3, COLORS.cardboardDark, 1);
+    g.strokeRoundedRect(16, 38, 92, 36, 6);
+    g.beginPath();
+    g.moveTo(62, 38);
+    g.lineTo(62, 74);
+    g.strokePath();
+    this.drawFlag(g, 26, 14, 0xe2483a);
+    g.generateTexture(key, 124, 92);
+    g.destroy();
+  }
+
+  // Tier 2 — sturdier wooden wagon: planks, rope, blue flag, bigger wheels.
+  makeBodyWood(key) {
+    const g = this.add.graphics();
+    this.drawWheels(g, 36, 94, 17, 0x6b4f2a);
+    // plank body
+    g.fillStyle(0xb07a3c, 1);
+    g.fillRoundedRect(12, 30, 100, 44, 6);
+    g.lineStyle(2, 0x8a5d29, 1);
+    g.strokeRoundedRect(12, 30, 100, 44, 6);
+    for (let x = 26; x < 110; x += 16) {
+      g.beginPath();
+      g.moveTo(x, 30);
+      g.lineTo(x, 74);
+      g.strokePath();
+    }
+    // rope band
+    g.lineStyle(3, 0xd8b06a, 1);
+    g.strokeRect(12, 48, 100, 0);
+    this.drawFlag(g, 22, 8, 0x3b82d6);
+    g.generateTexture(key, 124, 92);
+    g.destroy();
+  }
+
+  // Tier 3 — riveted iron buggy: metal plates, rivets, a little cab.
+  makeBodyIron(key) {
+    const g = this.add.graphics();
+    this.drawWheels(g, 38, 96, 18, 0x9aa0ab);
+    // hull
+    g.fillStyle(0x8b929c, 1);
+    g.fillRoundedRect(10, 30, 104, 46, 8);
+    g.fillStyle(0x767d88, 1);
+    g.fillRoundedRect(10, 56, 104, 20, 8);
+    g.lineStyle(3, 0x5d636d, 1);
+    g.strokeRoundedRect(10, 30, 104, 46, 8);
+    // cab / windshield
+    g.fillStyle(0x6fb6d6, 1);
+    g.fillRoundedRect(30, 22, 34, 18, 4);
+    g.lineStyle(2, 0x5d636d, 1);
+    g.strokeRoundedRect(30, 22, 34, 18, 4);
+    // rivets
+    g.fillStyle(0x5d636d, 1);
+    for (let x = 18; x < 110; x += 16) {
+      g.fillCircle(x, 36, 2.2);
+      g.fillCircle(x, 70, 2.2);
+    }
+    this.drawFlag(g, 20, 6, 0xffd34d);
+    g.generateTexture(key, 124, 92);
+    g.destroy();
+  }
+
+  // Weapon icons mount by their back-center and extend to the right.
+  makeWeaponBow(key) {
+    const g = this.add.graphics();
+    // bow limb (arc bulging right)
+    g.lineStyle(4, 0x8a5d29, 1);
+    g.beginPath();
+    g.arc(6, 16, 14, -Math.PI / 2.2, Math.PI / 2.2, false);
+    g.strokePath();
+    // string
+    g.lineStyle(1.5, 0xe8e8e8, 1);
+    g.beginPath();
+    g.moveTo(6, 3);
+    g.lineTo(6, 29);
+    g.strokePath();
+    // nocked arrow
+    g.lineStyle(3, 0xffd34d, 1);
+    g.beginPath();
+    g.moveTo(6, 16);
+    g.lineTo(28, 16);
+    g.strokePath();
+    g.fillStyle(0xe88f1a, 1);
+    g.fillTriangle(26, 11, 26, 21, 32, 16);
+    g.generateTexture(key, 34, 32);
+    g.destroy();
+  }
+
+  makeWeaponCrossbow(key) {
+    const g = this.add.graphics();
+    // stock
+    g.fillStyle(0x7a5a30, 1);
+    g.fillRoundedRect(0, 13, 30, 7, 2);
+    // limbs
+    g.lineStyle(4, 0x4a4a52, 1);
+    g.beginPath();
+    g.moveTo(20, 4);
+    g.lineTo(20, 28);
+    g.strokePath();
+    // string
+    g.lineStyle(1.5, 0xe8e8e8, 1);
+    g.beginPath();
+    g.moveTo(20, 6);
+    g.lineTo(8, 16);
+    g.lineTo(20, 26);
+    g.strokePath();
+    // bolt
+    g.fillStyle(0xcfd3da, 1);
+    g.fillRect(20, 14, 14, 4);
+    g.fillStyle(0x9aa0ab, 1);
+    g.fillTriangle(34, 12, 34, 20, 40, 16);
+    g.generateTexture(key, 40, 32);
+    g.destroy();
+  }
+
+  makeWeaponCatapult(key) {
+    const g = this.add.graphics();
+    // frame
+    g.fillStyle(0x6b4f2a, 1);
+    g.fillRect(2, 24, 30, 6);
+    g.lineStyle(4, 0x6b4f2a, 1);
+    g.beginPath();
+    g.moveTo(10, 28);
+    g.lineTo(18, 8);
+    g.strokePath();
+    // throwing arm
+    g.lineStyle(4, 0x8a5d29, 1);
+    g.beginPath();
+    g.moveTo(18, 8);
+    g.lineTo(34, 14);
+    g.strokePath();
+    // bucket + rock
+    g.fillStyle(0x9aa0ab, 1);
+    g.fillCircle(34, 12, 7);
+    g.fillStyle(0x6b6f78, 1);
+    g.fillCircle(34, 11, 4);
+    g.generateTexture(key, 40, 34);
     g.destroy();
   }
 
@@ -246,16 +385,71 @@ export default class BootScene extends Phaser.Scene {
     g.destroy();
   }
 
-  // Simple arrow-ish projectile.
-  makeBullet(key) {
-    const W = 22;
-    const H = 10;
+  // Projectiles ---------------------------------------------------------
+  makeShotBow(key) {
     const g = this.add.graphics();
     g.fillStyle(COLORS.bullet, 1);
     g.fillRoundedRect(0, 2, 16, 6, 3);
     g.fillStyle(COLORS.bulletEdge, 1);
     g.fillTriangle(14, 0, 14, 10, 22, 5);
-    g.generateTexture(key, W, H);
+    g.generateTexture(key, 22, 10);
+    g.destroy();
+  }
+
+  makeShotCrossbow(key) {
+    const g = this.add.graphics();
+    g.fillStyle(0xcfd3da, 1);
+    g.fillRect(0, 3, 18, 4);
+    g.fillStyle(0x8b929c, 1);
+    g.fillTriangle(16, 1, 16, 9, 24, 5);
+    g.generateTexture(key, 24, 10);
+    g.destroy();
+  }
+
+  makeShotCatapult(key) {
+    const g = this.add.graphics();
+    g.fillStyle(0x8b8f98, 1);
+    g.fillCircle(9, 9, 9);
+    g.fillStyle(0x6b6f78, 1);
+    g.fillCircle(7, 7, 4);
+    g.generateTexture(key, 18, 18);
+    g.destroy();
+  }
+
+  // Bolt — the friendly tinkering robot dog who runs the Garage.
+  makeBolt(key) {
+    const g = this.add.graphics();
+    // body
+    g.fillStyle(0xd7a13a, 1);
+    g.fillRoundedRect(10, 34, 52, 30, 8);
+    // legs
+    g.fillStyle(0xb9842a, 1);
+    g.fillRoundedRect(16, 60, 8, 14, 3);
+    g.fillRoundedRect(48, 60, 8, 14, 3);
+    // head
+    g.fillStyle(0xe7b245, 1);
+    g.fillRoundedRect(44, 14, 34, 30, 8);
+    // ear (antenna)
+    g.lineStyle(3, 0x8b929c, 1);
+    g.beginPath();
+    g.moveTo(52, 14);
+    g.lineTo(50, 2);
+    g.strokePath();
+    g.fillStyle(0xff5d5d, 1);
+    g.fillCircle(50, 2, 3);
+    // snout
+    g.fillStyle(0xb9842a, 1);
+    g.fillRoundedRect(70, 30, 12, 10, 3);
+    // eye (screen)
+    g.fillStyle(0x2b2b33, 1);
+    g.fillRoundedRect(52, 22, 18, 12, 3);
+    g.fillStyle(0x6fd0ff, 1);
+    g.fillCircle(58, 28, 3);
+    g.fillCircle(65, 28, 3);
+    // tail (bolt)
+    g.fillStyle(0x9aa0ab, 1);
+    g.fillTriangle(10, 38, 10, 50, 2, 44);
+    g.generateTexture(key, 86, 76);
     g.destroy();
   }
 }

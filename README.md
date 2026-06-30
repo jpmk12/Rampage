@@ -38,11 +38,19 @@ car you steer up/down, and a working fire button.
 **Milestone 1 — Core loop (done):** goblins run in from the right, your shots
 destroy them with a cartoony poof, defeated goblins drop Scrap that auto-homes
 into a counter, a progress bar tracks your run, and a checkered finish flag
-rolls in to end the level with a confetti "Level Complete!" screen (R or tap to
-replay). All art is still generated in code — no binary assets yet.
+rolls in to end the level.
 
-Next up — **Milestone 2:** the end-of-level Garage upgrade screen — spend Scrap
-to buy a new car body or weapon and see the car change, saved to `localStorage`.
+**Milestone 2 — The Garage (done):** finishing a level rolls you into Bolt the
+robot dog's Garage. Spend Scrap on a new **car body** (Cardboard Cart → Wooden
+Wagon → Iron Buggy) or **weapon** (Bow → Crossbow → Catapult) — the car preview
+and your real in-game stats (fire rate, projectile, damage) change with each
+pick. Affordable items glow, owned ones can be re-equipped for free, and
+everything saves to `localStorage`, so progress survives a refresh. Hit
+**ROLL OUT!** to start the next level with your upgraded ride. Art is still all
+generated in code — no binary assets yet.
+
+Next up — **Milestone 3:** enemy variety (lobbers, brutes, flyers), jumping,
+and a terrain hazard, building toward the full Level 1 boss fight.
 See the roadmap in `GAME_DESIGN.md`.
 
 ## Tech

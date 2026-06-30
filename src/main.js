@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT } from './config.js';
+import { Player } from './state/PlayerState.js';
 import BootScene from './scenes/BootScene.js';
 import GameScene from './scenes/GameScene.js';
+import GarageScene from './scenes/GarageScene.js';
 
 const config = {
   type: Phaser.AUTO,
@@ -21,10 +23,11 @@ const config = {
       debug: false,
     },
   },
-  scene: [BootScene, GameScene],
+  scene: [BootScene, GameScene, GarageScene],
 };
 
 const game = new Phaser.Game(config);
 
 // Expose for quick debugging / automated smoke tests in the browser console.
 window.__PHASER_GAME__ = game;
+window.__PLAYER__ = Player;
