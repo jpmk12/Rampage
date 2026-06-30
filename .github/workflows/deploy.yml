@@ -18,10 +18,12 @@ permissions:
   pages: write
   id-token: write
 
-# Only one Pages deploy at a time; newer pushes cancel in-progress ones.
+# Serialize Pages deploys: let an in-progress run finish before the next starts,
+# rather than cancelling it (cancelling mid-publish is what leaves the backend
+# "in progress" and makes the next deploy fail).
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -61,6 +63,29 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy to GitHub Pages
+      # GitHub's Pages backend can stay "in progress" for a few minutes after a
+      # prior run reports success, which makes a fresh deploy fail with a 400
+      # "in progress deployment" error. So we retry a couple of times with a
+      # wait, which lets the previous deployment drain and self-heals.
+      - name: Deploy to GitHub Pages (attempt 1)
         id: deployment
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      - name: Wait before retry
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 90
+
+      - name: Deploy to GitHub Pages (attempt 2)
+        id: deployment2
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      - name: Wait before final retry
+        if: steps.deployment.outcome == 'failure' && steps.deployment2.outcome == 'failure'
+        run: sleep 120
+
+      - name: Deploy to GitHub Pages (final attempt)
+        if: steps.deployment.outcome == 'failure' && steps.deployment2.outcome == 'failure'
         uses: actions/deploy-pages@v4
