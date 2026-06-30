@@ -658,28 +658,35 @@ export default class BootScene extends Phaser.Scene {
     g.destroy();
   }
 
-  // Bolt-on top turret: a chunky gun on a base, barrel pointing right.
-  // Anchored at the bottom-center so it sits on (and stacks on) the hull.
+  // Bolt-on top turret: a flat-topped, flat-bottomed armored gun segment so it
+  // STACKS FLUSH into a clean tower. Anchored at the bottom-center.
   makeTurret(key) {
     if (this.textures.exists(key)) return;
-    const W = 48;
-    const H = 42;
+    const W = 52;
+    const H = 30;
     const g = this.add.graphics();
-    // base plate
-    g.fillStyle(0x3a3f47, 1);
-    g.fillRoundedRect(8, 30, 30, 10, 4);
-    g.fillStyle(0x4a4f57, 1);
-    g.fillRoundedRect(10, 24, 26, 12, 4);
-    // dome
+    // main armored block (flat top & bottom, small corner radius)
     g.fillStyle(0x6b727d, 1);
-    g.fillCircle(22, 22, 13);
-    g.fillStyle(0x9aa0ab, 1);
-    g.fillCircle(17, 17, 4);
+    g.fillRoundedRect(8, 1, 30, 27, 4);
+    // top highlight band
+    g.fillStyle(0x828a95, 1);
+    g.fillRoundedRect(8, 1, 30, 7, 4);
+    // bottom mount lip — a touch wider, so it visually sits on the one below
+    g.fillStyle(0x4a4f57, 1);
+    g.fillRect(6, 23, 34, 7);
+    // outline + rivets
+    g.lineStyle(2, 0x3a3f47, 1);
+    g.strokeRoundedRect(8, 1, 30, 27, 4);
+    g.fillStyle(0x3a3f47, 1);
+    [8, 21].forEach((yy) => {
+      g.fillCircle(13, yy, 1.6);
+      g.fillCircle(33, yy, 1.6);
+    });
     // barrel pointing right
     g.fillStyle(0x33383f, 1);
-    g.fillRoundedRect(22, 16, 24, 10, 3);
+    g.fillRoundedRect(30, 9, 20, 10, 3);
     g.fillStyle(0x55606b, 1);
-    g.fillRoundedRect(42, 14, 6, 14, 2);
+    g.fillRoundedRect(46, 7, 5, 14, 2);
     g.generateTexture(key, W, H);
     g.destroy();
   }

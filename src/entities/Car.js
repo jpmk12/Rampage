@@ -1,10 +1,11 @@
 import { getBody, getWeapon } from '../data/catalog.js';
 
 // Bolt-on turrets stack vertically into a tower on the roof (relative to the
-// bottom-center origin). Each one sits on top of the previous.
-const TURRET_X = 4;
-const TURRET_BASE_Y = -58; // first turret's base sits here
-const TURRET_STACK = 30; // each turret stacks this much higher
+// bottom-center origin). The segments are flat-topped so they sit flush; the
+// stack step equals the segment's body height so there are no gaps.
+const TURRET_X = 6;
+const TURRET_BASE_Y = -54; // first turret's base sits here
+const TURRET_STACK = 25; // each turret stacks this much higher (≈ segment height)
 
 // Builds a car as a Phaser Container = body + weapon (+ any top turrets), so
 // the loadout can change visually just by rebuilding it. The container's origin
@@ -42,8 +43,8 @@ export function addTurret(scene, container, index) {
   const t = scene.add.image(TURRET_X, y, 'turret').setOrigin(0.5, 1);
   container.add(t);
   const muzzles = container.getData('turretMuzzles');
-  // muzzle = barrel tip of this turret (texture is 48x42, origin bottom-center)
-  muzzles.push({ x: TURRET_X + 22, y: y - 20 });
+  // muzzle = barrel tip of this turret (texture 52x30, origin bottom-center)
+  muzzles.push({ x: TURRET_X + 24, y: y - 16 });
   container.setData('turretMuzzles', muzzles);
   return t;
 }
