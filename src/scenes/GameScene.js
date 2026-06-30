@@ -99,9 +99,64 @@ export default class GameScene extends Phaser.Scene {
     sound.startMusic();
     this.events.once('shutdown', () => sound.stopMusic());
     this.events.once('destroy', () => sound.stopMusic());
+    // pause/resume music with the scene (pause menu)
+    this.events.on('pause', () => sound.stopMusic());
+    this.events.on('resume', () => {
+      sound.setMuted(Player.state.muted);
+      sound.startMusic();
+    });
 
+    this.buildWeather();
     this.cameras.main.fadeIn(300, 27, 29, 42);
     this.lastDustAt = 0;
+  }
+
+  // Per-biome ambient weather particles.
+  buildWeather() {
+    const id = this.levelId;
+    const W = GAME_WIDTH;
+    const top = GROUND_TOP_Y;
+    let p;
+    if (id === 4) {
+      // snow
+      p = this.add.particles(0, -10, 'flake', {
+        x: { min: 0, max: W }, lifespan: 7000, speedY: { min: 30, max: 70 },
+        speedX: { min: -25, max: 15 }, scale: { min: 0.4, max: 1.0 },
+        alpha: { start: 0.9, end: 0.5 }, frequency: 150, quantity: 1, tint: 0xffffff,
+      });
+    } else if (id === 5) {
+      // rising embers
+      p = this.add.particles(0, GAME_HEIGHT + 10, 'flake', {
+        x: { min: 0, max: W }, lifespan: 4200, speedY: { min: -95, max: -40 },
+        speedX: { min: -18, max: 18 }, scale: { min: 0.3, max: 0.8 },
+        alpha: { start: 0.9, end: 0 }, frequency: 110, quantity: 1,
+        tint: [0xff7a3a, 0xffd24d], blendMode: 'ADD',
+      });
+    } else if (id === 3) {
+      // blowing sand
+      p = this.add.particles(W + 10, 0, 'flake', {
+        y: { min: top - 170, max: top }, lifespan: 2400, speedX: { min: -280, max: -170 },
+        speedY: { min: -12, max: 22 }, scale: { min: 0.2, max: 0.5 },
+        alpha: { start: 0.5, end: 0 }, frequency: 55, quantity: 1, tint: 0xe6c48a,
+      });
+    } else if (id === 2) {
+      // drifting swamp spores / fireflies
+      p = this.add.particles(0, 0, 'flake', {
+        x: { min: 0, max: W }, y: { min: top - 190, max: top - 10 }, lifespan: 5000,
+        speedX: { min: -22, max: 22 }, speedY: { min: -10, max: 10 },
+        scale: { min: 0.4, max: 0.9 }, alpha: { start: 0.6, end: 0 },
+        frequency: 240, quantity: 1, tint: 0x9acb6a, blendMode: 'ADD',
+      });
+    } else {
+      // floating pollen (Greenwood + default)
+      p = this.add.particles(0, 0, 'flake', {
+        x: { min: 0, max: W }, y: { min: top - 200, max: top }, lifespan: 6000,
+        speedY: { min: -14, max: -3 }, speedX: { min: -10, max: 10 },
+        scale: { min: 0.2, max: 0.5 }, alpha: { start: 0.5, end: 0 },
+        frequency: 300, quantity: 1, tint: 0xfff0b0,
+      });
+    }
+    if (p) p.setDepth(12);
   }
 
   // Fade out, then switch scenes (smoother than a hard cut).
@@ -180,6 +235,10 @@ export default class GameScene extends Phaser.Scene {
     this.input.once('pointerdown', wake);
     this.input.keyboard.once('keydown', wake);
 
+    // pause with Esc or P
+    this.input.keyboard.on('keydown-ESC', () => this.pauseGame());
+    this.input.keyboard.on('keydown-P', () => this.pauseGame());
+
     this.input.on('pointerdown', (p) => {
       if (this.muteHit(p)) return;
       if (this.state === 'over') {
@@ -249,13 +308,20 @@ export default class GameScene extends Phaser.Scene {
       .setAlpha(0.35)
       .setDepth(20);
 
-    // mute toggle (top-right corner)
+    // mute + pause toggles (top-right corner)
     this.muteBtn = this.add
       .text(GAME_WIDTH - 34, 60, Player.state.muted ? '🔇' : '🔊', { fontSize: '24px' })
       .setOrigin(0.5)
       .setDepth(21)
       .setInteractive({ useHandCursor: true });
     this.muteBtn.on('pointerdown', () => this.toggleMute());
+
+    this.pauseBtn = this.add
+      .text(GAME_WIDTH - 76, 60, '⏸', { fontSize: '24px' })
+      .setOrigin(0.5)
+      .setDepth(21)
+      .setInteractive({ useHandCursor: true });
+    this.pauseBtn.on('pointerdown', () => this.pauseGame());
 
     // boss health bar (hidden until a boss appears)
     this.bossBarBg = this.add.rectangle(GAME_WIDTH / 2, 56, 440, 22, 0x1b1d2a, 0.7).setDepth(20).setVisible(false);
@@ -285,9 +351,18 @@ export default class GameScene extends Phaser.Scene {
     this.muteBtn.setText(m ? '🔇' : '🔊');
   }
 
-  // Returns true if the pointer hit the mute button (so it isn't also a jump).
+  pauseGame() {
+    if (this.state !== 'playing') return;
+    this.scene.launch('Pause');
+    this.scene.pause();
+  }
+
+  // True if the pointer hit a HUD button (so it isn't also a jump/aim).
   muteHit(p) {
-    return Math.abs(p.x - this.muteBtn.x) < 24 && Math.abs(p.y - this.muteBtn.y) < 22;
+    const onMute = Math.abs(p.x - this.muteBtn.x) < 24 && Math.abs(p.y - this.muteBtn.y) < 22;
+    const onPause = Math.abs(p.x - this.pauseBtn.x) < 24 && Math.abs(p.y - this.pauseBtn.y) < 22;
+    if (onPause) this.pauseGame();
+    return onMute || onPause;
   }
 
   update(time, delta) {

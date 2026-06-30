@@ -42,6 +42,7 @@ export default class BootScene extends Phaser.Scene {
     this.makeTurret('turret');
     this.makeCloud('cloud');
     this.makeSun('sun');
+    this.makeFlake('flake');
     this.makeHeart('heart', true);
     this.makeHeart('heart-empty', false);
     this.makeDrummer('drummer');
@@ -66,7 +67,7 @@ export default class BootScene extends Phaser.Scene {
       this.makeProjBall(`proj-${lv.id}`, lv.projColor);
     });
 
-    this.scene.start('Game');
+    this.scene.start('Title');
   }
 
   // Vertical gradient sky, drawn one scanline at a time (cheap, runs once).
@@ -845,6 +846,18 @@ export default class BootScene extends Phaser.Scene {
     g.fillStyle(0xffffff, 1);
     g.fillRoundedRect(30, 40, 90, 18, 9);
     g.generateTexture(key, W, H);
+    g.destroy();
+  }
+
+  // Tiny soft particle for weather (snow, embers, pollen, etc.; tinted at use).
+  makeFlake(key) {
+    const S = 10;
+    const g = this.add.graphics();
+    g.fillStyle(0xffffff, 0.35);
+    g.fillCircle(5, 5, 5);
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(5, 5, 2.6);
+    g.generateTexture(key, S, S);
     g.destroy();
   }
 

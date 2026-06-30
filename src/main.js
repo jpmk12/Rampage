@@ -2,8 +2,10 @@ import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT } from './config.js';
 import { Player } from './state/PlayerState.js';
 import BootScene from './scenes/BootScene.js';
+import TitleScene from './scenes/TitleScene.js';
 import GameScene from './scenes/GameScene.js';
 import GarageScene from './scenes/GarageScene.js';
+import PauseScene from './scenes/PauseScene.js';
 
 const config = {
   type: Phaser.AUTO,
@@ -23,7 +25,7 @@ const config = {
       debug: false,
     },
   },
-  scene: [BootScene, GameScene, GarageScene],
+  scene: [BootScene, TitleScene, GameScene, GarageScene, PauseScene],
 };
 
 const game = new Phaser.Game(config);

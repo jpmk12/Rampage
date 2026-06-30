@@ -113,8 +113,16 @@ Iron Buggy → Armored Truck → Battle Tank, each gated behind a boss drop) and
 boss rolls the victory/Champion ending. It's a complete game — all art and
 audio still generated in code, no binary assets.
 
-Possible next steps: cosmetic sticker shop, a Little-Kid (no-death) mode toggle,
-real sprite/audio assets, and a title screen. See `GAME_DESIGN.md`.
+**Polish & shell (done):** a **title screen** (your current car idling on an
+animated landscape with a PLAY button), a **pause menu** (⏸ button or Esc/P →
+Resume / Restart Level / Main Menu), per-biome **ambient weather** (pollen,
+swamp spores, blowing sand, falling snow, rising embers), a sun/moon and
+drifting clouds, wheel dust, muzzle flashes, a damage flash, and smooth scene
+fades.
+
+See **[docs/ART_UPGRADE.md](./docs/ART_UPGRADE.md)** for the plan to take the
+graphics further (real sprite assets, animation, shaders, etc.). Other possible
+next steps: a cosmetic sticker shop and a Little-Kid (no-death) mode toggle.
 
 ## Tech
 
