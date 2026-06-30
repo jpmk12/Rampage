@@ -5,7 +5,6 @@ import {
   GROUND_TOP_Y,
   WORLD_SCROLL,
   CAR,
-  JUMP_CLEAR,
   COMBAT,
   HAZARD,
   SCROLL,
@@ -18,6 +17,13 @@ import { Player } from '../state/PlayerState.js';
 import { getBody, getWeapon } from '../data/catalog.js';
 import { pickEnemyType } from '../data/enemies.js';
 import { buildCar, muzzleFor } from '../entities/Car.js';
+import { sound } from '../audio/Sound.js';
+
+// Level-1 boss roster.
+const BOSSES = {
+  drummer: { texture: 'drummer', name: 'Goblin Drummer', hp: 12, x: 740, summonEvery: 1900 },
+  gloop: { texture: 'gloop', name: 'Big Chief Gloop', hp: 34, x: 700, throwEvery: 1600 },
+};
 
 // Aim limits: mostly upward (negative = up on screen) so you can hit flyers.
 const AIM = { min: -1.15, max: 0.45, rate: 0.0026, topZ: 70, botZ: GROUND_TOP_Y };
@@ -39,9 +45,9 @@ export default class GameScene extends Phaser.Scene {
     this.levelStartScrap = profile.scrap;
 
     this.state = 'playing';
+    this.phase = 'travel'; // travel -> miniboss -> boss
     this.distance = 0;
-    this.flagSpawned = false;
-    this.flag = null;
+    this.boss = null;
 
     // car physics + aim
     this.carVY = 0;
@@ -64,6 +70,13 @@ export default class GameScene extends Phaser.Scene {
 
     this.physics.add.overlap(this.bullets, this.goblins, this.onBulletHit, null, this);
     this.physics.add.overlap(this.bullets, this.enemyShots, this.onShootRock, null, this);
+    this.physics.add.overlap(this.bullets, this.bosses, this.onBulletHitBoss, null, this);
+
+    // audio: start the loop, and stop it when the scene shuts down/restarts
+    sound.setMuted(Player.state.muted);
+    sound.startMusic();
+    this.events.once('shutdown', () => sound.stopMusic());
+    this.events.once('destroy', () => sound.stopMusic());
   }
 
   buildBackground() {
@@ -88,6 +101,7 @@ export default class GameScene extends Phaser.Scene {
   buildGroups() {
     this.bullets = this.physics.add.group();
     this.goblins = this.physics.add.group();
+    this.bosses = this.physics.add.group();
     this.enemyShots = this.physics.add.group();
     this.scraps = this.add.group();
     this.hazards = this.add.group();
@@ -100,7 +114,13 @@ export default class GameScene extends Phaser.Scene {
     this.jumpKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.input.addPointer(2); // allow two thumbs on a tablet
 
+    // browsers need a user gesture before audio can play
+    const wake = () => sound.resume();
+    this.input.once('pointerdown', wake);
+    this.input.keyboard.once('keydown', wake);
+
     this.input.on('pointerdown', (p) => {
+      if (this.muteHit(p)) return;
       if (this.state === 'over') {
         this.scene.restart();
         return;
@@ -164,14 +184,52 @@ export default class GameScene extends Phaser.Scene {
       .text(GAME_WIDTH - 130, GAME_HEIGHT - 26, 'drag = aim ⇅', hint)
       .setAlpha(0.35)
       .setDepth(20);
+
+    // mute toggle (top-right corner)
+    this.muteBtn = this.add
+      .text(GAME_WIDTH - 34, 60, Player.state.muted ? '🔇' : '🔊', { fontSize: '24px' })
+      .setOrigin(0.5)
+      .setDepth(21)
+      .setInteractive({ useHandCursor: true });
+    this.muteBtn.on('pointerdown', () => this.toggleMute());
+
+    // boss health bar (hidden until a boss appears)
+    this.bossBarBg = this.add.rectangle(GAME_WIDTH / 2, 56, 440, 22, 0x1b1d2a, 0.7).setDepth(20).setVisible(false);
+    this.bossBarFill = this.add
+      .rectangle(GAME_WIDTH / 2 - 214, 56, 428, 14, 0xe2483a, 1)
+      .setOrigin(0, 0.5)
+      .setDepth(21)
+      .setVisible(false);
+    this.bossName = this.add
+      .text(GAME_WIDTH / 2, 34, '', { ...style, fontSize: '16px', color: '#ffd34d' })
+      .setOrigin(0.5)
+      .setDepth(21)
+      .setVisible(false);
+  }
+
+  toggleMute() {
+    const m = !Player.state.muted;
+    Player.setMuted(m);
+    sound.setMuted(m);
+    if (!m) sound.resume();
+    this.muteBtn.setText(m ? '🔇' : '🔊');
+  }
+
+  // Returns true if the pointer hit the mute button (so it isn't also a jump).
+  muteHit(p) {
+    return Math.abs(p.x - this.muteBtn.x) < 24 && Math.abs(p.y - this.muteBtn.y) < 22;
   }
 
   update(time, delta) {
     if (this.state === 'playing') {
-      this.scrollWorld(delta);
-      this.advanceLevel(delta);
-      this.maybeSpawnGoblin(time);
-      this.maybeSpawnHazard(time);
+      if (this.phase === 'travel') {
+        this.scrollWorld(delta);
+        this.advanceLevel(delta);
+        this.maybeSpawnGoblin(time);
+        this.maybeSpawnHazard(time);
+      } else {
+        this.updateBoss(time, delta);
+      }
       this.handleFiring(time);
     }
     this.updateCarPhysics(delta);
@@ -180,7 +238,6 @@ export default class GameScene extends Phaser.Scene {
     this.updateEnemyShots();
     this.updateScraps(delta);
     this.updateHazards(delta);
-    this.updateFlag(delta);
     this.cullBullets();
   }
 
@@ -194,7 +251,7 @@ export default class GameScene extends Phaser.Scene {
     this.distance += WORLD_SCROLL * delta;
     const p = Phaser.Math.Clamp(this.distance / LEVEL.length, 0, 1);
     this.progressFill.width = 4 + p * 252;
-    if (!this.flagSpawned && this.distance >= LEVEL.length) this.spawnFlag();
+    if (this.distance >= LEVEL.length) this.startBossSequence();
   }
 
   // ---- car: jump + aim --------------------------------------------------
@@ -203,6 +260,7 @@ export default class GameScene extends Phaser.Scene {
     if (this.state !== 'playing' || !this.onGround) return;
     this.carVY = -CAR.jumpVel;
     this.onGround = false;
+    sound.jump();
   }
 
   updateCarPhysics(delta) {
@@ -363,6 +421,7 @@ export default class GameScene extends Phaser.Scene {
   defeatGoblin(goblin) {
     const type = goblin.getData('type');
     const yy = type.lane === 'air' ? goblin.y : goblin.y - 26;
+    sound.defeat();
     this.poof(goblin.x, yy, COLORS.goblin);
     for (let i = 0; i < (type.scrap || 1); i++) {
       this.spawnScrap(goblin.x + Phaser.Math.Between(-12, 12), yy + Phaser.Math.Between(-8, 8));
@@ -396,6 +455,7 @@ export default class GameScene extends Phaser.Scene {
 
     this.health -= amount;
     this.invulnUntil = this.time.now + COMBAT.invuln;
+    sound.hurt();
     this.cameras.main.shake(180, 0.006);
     this.renderHearts();
 
@@ -458,6 +518,7 @@ export default class GameScene extends Phaser.Scene {
 
   collectScrap(s) {
     s.destroy();
+    sound.pickup();
     Player.state.scrap += SCRAP.value;
     this.scrapText.setText(String(Player.state.scrap));
     this.tweens.add({
@@ -500,48 +561,200 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  // ---- finish flag ------------------------------------------------------
+  // ---- boss sequence ----------------------------------------------------
 
-  spawnFlag() {
-    this.flagSpawned = true;
-    this.flag = this.add.image(GAME_WIDTH + 80, GROUND_TOP_Y + 6, 'flag');
-    this.flag.setOrigin(0.2, 1).setDepth(3);
+  startBossSequence() {
+    this.phase = 'miniboss';
+    this.progressFill.width = 256;
+    this.bannerFlash('⚠  BOSS INCOMING!  ⚠', '#ff7a7a');
+    this.time.delayedCall(900, () => this.spawnBoss('drummer'));
   }
 
-  updateFlag(delta) {
-    if (!this.flag || this.state !== 'playing') return;
-    this.flag.x -= WORLD_SCROLL * delta;
-    if (this.flag.x <= this.car.x) this.completeLevel();
+  spawnBoss(kind) {
+    const cfg = BOSSES[kind];
+    const b = this.bosses.create(GAME_WIDTH + 140, GROUND_TOP_Y + 6, cfg.texture);
+    b.setOrigin(0.5, 1).setDepth(5);
+    b.body.setAllowGravity(false);
+    b.setData('kind', kind);
+    b.setData('hp', cfg.hp);
+    b.setData('maxHp', cfg.hp);
+    b.setData('fighting', false);
+    b.setData('baseY', GROUND_TOP_Y + 6);
+    b.setData('nextAttack', 0);
+    this.boss = b;
+
+    this.showBossBar(cfg.name);
+    // roll in, then start fighting
+    this.tweens.add({
+      targets: b,
+      x: cfg.x,
+      duration: 1100,
+      ease: 'Sine.easeOut',
+      onComplete: () => {
+        if (b.active) {
+          b.setData('fighting', true);
+          b.setData('nextAttack', this.time.now + 700);
+        }
+      },
+    });
   }
 
-  completeLevel() {
+  updateBoss(time, delta) {
+    const b = this.boss;
+    if (!b || !b.active) return;
+    const kind = b.getData('kind');
+    const cfg = BOSSES[kind];
+
+    // bob in place
+    b.y = b.getData('baseY') + Math.sin(time * 0.004) * 6;
+
+    if (!b.getData('fighting')) return;
+    if (time < b.getData('nextAttack')) return;
+
+    if (kind === 'drummer') {
+      this.summonRunner();
+      b.setData('nextAttack', time + cfg.summonEvery);
+    } else {
+      const enraged = b.getData('hp') <= b.getData('maxHp') * 0.5;
+      this.throwCabbage(b);
+      if (enraged) this.time.delayedCall(260, () => b.active && this.throwCabbage(b));
+      b.setData('nextAttack', time + (enraged ? cfg.throwEvery * 0.7 : cfg.throwEvery));
+    }
+  }
+
+  summonRunner() {
+    const e = this.goblins.create(GAME_WIDTH + 40, GROUND_TOP_Y + 2, 'goblin');
+    e.setOrigin(0.5, 1);
+    e.body.setAllowGravity(false);
+    e.setVelocityX(-320);
+    e.setData('type', { lane: 'ground', clearH: 42, hp: 1, scrap: 1 });
+    e.setData('hp', 1);
+    e.setData('seed', Math.random() * Math.PI * 2);
+  }
+
+  throwCabbage(b) {
+    const c = this.enemyShots.create(b.x - 40, b.y - 90, 'cabbage');
+    c.body.setAllowGravity(true);
+    c.body.setGravityY(900);
+    c.setVelocity(-520, -430);
+    c.setData('spin', Phaser.Math.FloatBetween(-0.02, 0.02));
+  }
+
+  onBulletHitBoss(bullet, boss) {
+    bullet.destroy();
+    if (!boss.active) return;
+    const hp = boss.getData('hp') - this.weapon.damage;
+    boss.setData('hp', Math.max(0, hp));
+    this.updateBossBar();
+    sound.bossHit();
+    boss.setTintFill(0xffffff);
+    this.time.delayedCall(60, () => boss.active && boss.clearTint());
+    if (hp <= 0) this.defeatBoss(boss);
+  }
+
+  defeatBoss(boss) {
+    const kind = boss.getData('kind');
+    const bx = boss.x;
+    const by = boss.y - 50;
+    boss.destroy();
+    this.boss = null;
+    this.hideBossBar();
+    sound.explode();
+    for (let i = 0; i < 5; i++) {
+      this.time.delayedCall(i * 90, () =>
+        this.poof(bx + Phaser.Math.Between(-40, 40), by + Phaser.Math.Between(-30, 30), 0xffe14d)
+      );
+    }
+
+    if (kind === 'drummer') {
+      this.phase = 'boss';
+      this.bannerFlash('Here comes the CHIEF!', '#ffe14d');
+      this.time.delayedCall(1100, () => this.spawnBoss('gloop'));
+    } else {
+      this.winLevel(true);
+    }
+  }
+
+  // ---- boss health bar UI ----
+  showBossBar(name) {
+    this.bossName.setText(name).setVisible(true);
+    this.bossBarBg.setVisible(true);
+    this.bossBarFill.setVisible(true);
+    this.bossBarFill.width = 428;
+  }
+  updateBossBar() {
+    if (!this.boss) return;
+    const frac = this.boss.getData('hp') / this.boss.getData('maxHp');
+    this.bossBarFill.width = Math.max(0, 428 * frac);
+  }
+  hideBossBar() {
+    this.bossName.setVisible(false);
+    this.bossBarBg.setVisible(false);
+    this.bossBarFill.setVisible(false);
+  }
+
+  bannerFlash(msg, color) {
+    const t = this.bannerText(GAME_WIDTH / 2, 150, msg, color, 34);
+    t.setAlpha(0);
+    this.tweens.add({
+      targets: t,
+      alpha: 1,
+      yoyo: true,
+      hold: 600,
+      duration: 300,
+      onComplete: () => t.destroy(),
+    });
+  }
+
+  winLevel(beatBoss) {
     this.state = 'complete';
     this.aiming = false;
+    this.freezeEnemies();
+    sound.stopMusic();
+    sound.win();
+
+    // boss drops the Sturdy Axle, which unlocks the Wooden Wagon
+    let bonus = 0;
+    if (beatBoss) {
+      bonus = 12;
+      Player.state.scrap += bonus;
+      Player.unlockPart('axle');
+    }
+
+    const cx = GAME_WIDTH / 2;
+    const cy = GAME_HEIGHT / 2;
+    this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x1b1d2a, 0.45).setDepth(30);
+    this.bannerText(cx, cy - 70, beatBoss ? 'YOU BEAT BIG CHIEF GLOOP!' : 'LEVEL COMPLETE!', '#ffe14d', 40);
+    if (beatBoss) {
+      this.add.image(cx, cy, 'axle').setScale(1.6).setDepth(32);
+      this.bannerText(cx, cy + 36, 'Sturdy Axle unlocked — build the Wooden Wagon!', '#9fe6a0', 18);
+    }
+    this.bannerText(cx, cy + 78, 'Rolling into the Garage…', '#ffffff', 20);
+    for (let i = 0; i < 30; i++) this.time.delayedCall(i * 22, () => this.confettiBit(cx, cy - 150));
+
+    const earned = Player.state.scrap - this.levelStartScrap;
+    Player.save();
+    this.time.delayedCall(2200, () => this.scene.start('Garage', { earned }));
+  }
+
+  freezeEnemies() {
     this.goblins.children.iterate((g) => {
       if (g) g.setVelocityX(0);
       return true;
     });
-
-    const cx = GAME_WIDTH / 2;
-    const cy = GAME_HEIGHT / 2;
-    this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x1b1d2a, 0.4).setDepth(30);
-    this.bannerText(cx, cy - 20, 'LEVEL COMPLETE!', '#ffe14d', 48);
-    this.bannerText(cx, cy + 34, 'Rolling into the Garage…', '#ffffff', 22);
-    for (let i = 0; i < 24; i++) this.time.delayedCall(i * 26, () => this.confettiBit(cx, cy - 140));
-
-    const earned = Player.state.scrap - this.levelStartScrap;
-    Player.save();
-    this.time.delayedCall(1700, () => this.scene.start('Garage', { earned }));
+    this.bosses.children.iterate((b) => {
+      if (b) b.setData('fighting', false);
+      return true;
+    });
   }
 
   gameOver() {
     this.state = 'over';
     this.aiming = false;
+    sound.stopMusic();
+    sound.lose();
     Player.save();
-    this.goblins.children.iterate((g) => {
-      if (g) g.setVelocityX(0);
-      return true;
-    });
+    this.freezeEnemies();
 
     const cx = GAME_WIDTH / 2;
     const cy = GAME_HEIGHT / 2;
@@ -597,6 +810,7 @@ export default class GameScene extends Phaser.Scene {
     shot.setRotation(this.aim);
     shot.body.setAllowGravity(false);
     shot.setVelocity(Math.cos(this.aim) * this.weapon.speed, Math.sin(this.aim) * this.weapon.speed);
+    sound.shoot();
 
     this.tweens.add({
       targets: this.car,

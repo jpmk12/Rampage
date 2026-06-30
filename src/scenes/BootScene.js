@@ -34,6 +34,10 @@ export default class BootScene extends Phaser.Scene {
     this.makeBrute('brute');
     this.makeLobber('lobber');
     this.makeFlyer('flyer');
+    this.makeDrummer('drummer');
+    this.makeGloop('gloop');
+    this.makeCabbage('cabbage');
+    this.makeAxle('axle');
     this.makeEnemyRock('enemy-rock');
     this.makeHazard('hazard');
     this.makeScrap('scrap');
@@ -455,6 +459,167 @@ export default class BootScene extends Phaser.Scene {
     // little fangs
     g.fillStyle(0xffffff, 1);
     g.fillTriangle(14, 28, 17, 28, 15.5, 32);
+    g.generateTexture(key, W, H);
+    g.destroy();
+  }
+
+  // Goblin Drummer mini-boss — a goblin banging a big drum. ~96x104.
+  makeDrummer(key) {
+    const W = 96;
+    const H = 104;
+    const g = this.add.graphics();
+    // ears
+    g.fillStyle(0x6fa336, 1);
+    g.fillTriangle(30, 16, 30, 36, 14, 24);
+    g.fillTriangle(66, 16, 66, 36, 82, 24);
+    // head
+    g.fillStyle(0x6fa336, 1);
+    g.fillRoundedRect(30, 6, 36, 28, 10);
+    // eyes
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(42, 18, 7);
+    g.fillCircle(56, 18, 7);
+    g.fillStyle(0x222222, 1);
+    g.fillCircle(40, 20, 3.2);
+    g.fillCircle(54, 20, 3.2);
+    // brows
+    g.lineStyle(3, 0x4f7d22, 1);
+    g.beginPath();
+    g.moveTo(36, 10); g.lineTo(48, 15);
+    g.moveTo(60, 10); g.lineTo(48, 15);
+    g.strokePath();
+    // body behind drum
+    g.fillStyle(0x6fa336, 1);
+    g.fillRoundedRect(28, 32, 40, 30, 10);
+    // the drum
+    g.fillStyle(0xb23b3b, 1);
+    g.fillRoundedRect(20, 54, 56, 36, 8);
+    g.fillStyle(0xf0e3c2, 1);
+    g.fillEllipse(48, 56, 56, 14);
+    g.lineStyle(3, 0xe2c34a, 1);
+    g.strokeRoundedRect(20, 54, 56, 36, 8);
+    // zig-zag drum trim
+    g.lineStyle(2, 0xe2c34a, 1);
+    g.beginPath();
+    for (let x = 22; x < 74; x += 8) { g.moveTo(x, 66); g.lineTo(x + 4, 78); g.lineTo(x + 8, 66); }
+    g.strokePath();
+    // legs
+    g.fillStyle(0x4f7d22, 1);
+    g.fillRoundedRect(30, 90, 12, 12, 3);
+    g.fillRoundedRect(54, 90, 12, 12, 3);
+    // drumsticks
+    g.lineStyle(4, 0x8a5d29, 1);
+    g.beginPath();
+    g.moveTo(8, 40); g.lineTo(26, 56);
+    g.moveTo(88, 40); g.lineTo(70, 56);
+    g.strokePath();
+    g.fillStyle(0xc9a06a, 1);
+    g.fillCircle(8, 40, 5);
+    g.fillCircle(88, 40, 5);
+    g.generateTexture(key, W, H);
+    g.destroy();
+  }
+
+  // Big Chief Gloop — a fat goblin chief in a wheelbarrow. ~168x132.
+  makeGloop(key) {
+    const W = 168;
+    const H = 132;
+    const g = this.add.graphics();
+    // wheelbarrow tray
+    g.fillStyle(0x8a5d29, 1);
+    g.fillRoundedRect(20, 70, 128, 40, 10);
+    g.lineStyle(3, 0x6b4720, 1);
+    g.strokeRoundedRect(20, 70, 128, 40, 10);
+    // wheel
+    g.fillStyle(0x2b2b33, 1);
+    g.fillCircle(40, 116, 16);
+    g.fillStyle(0x55555f, 1);
+    g.fillCircle(40, 116, 6);
+    // leg/stand
+    g.lineStyle(5, 0x6b4720, 1);
+    g.beginPath();
+    g.moveTo(132, 108); g.lineTo(146, 122);
+    g.strokePath();
+    // fat goblin body
+    g.fillStyle(0x5f9a2f, 1);
+    g.fillEllipse(86, 64, 96, 70);
+    g.fillStyle(0x86c04e, 1);
+    g.fillEllipse(86, 74, 60, 40);
+    // arms
+    g.fillStyle(0x5f9a2f, 1);
+    g.fillRoundedRect(118, 50, 26, 16, 8);
+    // head
+    g.fillStyle(0x5f9a2f, 1);
+    g.fillRoundedRect(52, 8, 64, 44, 16);
+    // ears
+    g.fillTriangle(52, 16, 52, 40, 34, 28);
+    g.fillTriangle(116, 16, 116, 40, 134, 28);
+    // chief headband + feathers
+    g.fillStyle(0xb23b3b, 1);
+    g.fillRect(52, 14, 64, 8);
+    g.fillStyle(0xe2c34a, 1);
+    g.fillTriangle(64, 14, 72, 14, 60, -6);
+    g.fillStyle(0x5db4ff, 1);
+    g.fillTriangle(80, 14, 88, 14, 90, -8);
+    // eyes
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(72, 30, 9);
+    g.fillCircle(96, 30, 9);
+    g.fillStyle(0x222222, 1);
+    g.fillCircle(70, 33, 4);
+    g.fillCircle(94, 33, 4);
+    // angry brows
+    g.lineStyle(5, 0x3c641a, 1);
+    g.beginPath();
+    g.moveTo(60, 20); g.lineTo(82, 28);
+    g.moveTo(108, 20); g.lineTo(86, 28);
+    g.strokePath();
+    // grin + tusks
+    g.lineStyle(4, 0x2c4a16, 1);
+    g.beginPath(); g.moveTo(74, 44); g.lineTo(96, 44); g.strokePath();
+    g.fillStyle(0xffffff, 1);
+    g.fillTriangle(76, 44, 80, 44, 78, 50);
+    g.fillTriangle(90, 44, 94, 44, 92, 50);
+    // a cabbage in hand
+    g.fillStyle(0x7cc24a, 1);
+    g.fillCircle(140, 52, 12);
+    g.lineStyle(2, 0x4f8a26, 1);
+    g.strokeCircle(140, 52, 12);
+    g.generateTexture(key, W, H);
+    g.destroy();
+  }
+
+  // A leafy cabbage that Gloop throws.
+  makeCabbage(key) {
+    const S = 32;
+    const g = this.add.graphics();
+    g.fillStyle(0x4f8a26, 1);
+    g.fillCircle(16, 16, 15);
+    g.fillStyle(0x7cc24a, 1);
+    g.fillCircle(16, 16, 11);
+    g.lineStyle(2, 0x3f7020, 1);
+    g.beginPath();
+    g.moveTo(16, 5); g.lineTo(16, 27);
+    g.moveTo(6, 12); g.lineTo(26, 20);
+    g.moveTo(26, 12); g.lineTo(6, 20);
+    g.strokePath();
+    g.generateTexture(key, S, S);
+    g.destroy();
+  }
+
+  // Sturdy Axle reward icon — an axle with two little wheels.
+  makeAxle(key) {
+    const W = 56;
+    const H = 32;
+    const g = this.add.graphics();
+    g.fillStyle(0x9aa0ab, 1);
+    g.fillRoundedRect(8, 13, 40, 6, 3);
+    g.fillStyle(0x2b2b33, 1);
+    g.fillCircle(12, 16, 11);
+    g.fillCircle(44, 16, 11);
+    g.fillStyle(0x8a8f98, 1);
+    g.fillCircle(12, 16, 4);
+    g.fillCircle(44, 16, 4);
     g.generateTexture(key, W, H);
     g.destroy();
   }

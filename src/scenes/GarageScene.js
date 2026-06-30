@@ -142,6 +142,7 @@ export default class GarageScene extends Phaser.Scene {
     const owned = kind === 'body' ? Player.ownsBody(item.id) : Player.ownsWeapon(item.id);
     const equipped = Player.state[kind] === item.id;
     const affordable = Player.state.scrap >= item.price;
+    const partLocked = !!item.requiresPart && !Player.hasPart(item.requiresPart) && !owned;
 
     let border = UI.locked;
     let status = `${item.price}`;
@@ -157,6 +158,11 @@ export default class GarageScene extends Phaser.Scene {
       border = UI.owned;
       status = 'EQUIP';
       statusColor = '#bfe6ff';
+    } else if (partLocked) {
+      dim = true;
+      border = UI.locked;
+      status = '🔒 Beat the boss';
+      statusColor = '#c9a0ff';
     } else if (affordable) {
       border = UI.buy;
       status = `BUY  ${item.price}`;
@@ -213,6 +219,12 @@ export default class GarageScene extends Phaser.Scene {
       if (kind === 'body') Player.equipBody(item.id);
       else Player.equipWeapon(item.id);
       this.afterChange();
+      return;
+    }
+
+    // locked behind a boss-drop part
+    if (item.requiresPart && !Player.hasPart(item.requiresPart)) {
+      this.denied(container);
       return;
     }
 

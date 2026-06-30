@@ -77,8 +77,18 @@ arcing rocks you can shoot down or jump), and **Flyer** (winged, aim up to hit)
 — plus a spiky **ground hazard** to jump. A **hearts** health system with
 invulnerability blink, and a **Game Over → retry** screen (you keep your scrap).
 
-Next up — **Milestone 4:** finish Level 1 — the **Goblin Drummer** mini-boss and
-**Big Chief Gloop** boss, with music & SFX. See the roadmap in `GAME_DESIGN.md`.
+**Milestone 4 — Boss & audio (done):** Level 1 now has a climax. At the end of
+the run the **Goblin Drummer** mini-boss rolls in (summoning goblins), and
+beating it brings out **Big Chief Gloop** — a wheelbarrow chief with a health
+bar who hurls arcing cabbages (jump them or shoot them down) and goes enraged
+below half health. Beating Gloop drops the **Sturdy Axle**, which unlocks the
+Wooden Wagon in the Garage. Plus the first **audio**: a synthesized chiptune
+loop and sound effects (shoot, jump, pickup, hits, explosions, win/lose
+jingles) — all generated in code, no audio files — with a 🔊 **mute toggle**.
+
+Next up — **Milestone 5:** the remaining biomes — Zombie Flats, Bandit
+Badlands, Frostbite Peaks, and Volcano Fortress — each with its own enemies,
+hazards, and boss. See the roadmap in `GAME_DESIGN.md`.
 
 ## Tech
 

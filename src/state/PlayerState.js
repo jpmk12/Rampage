@@ -12,6 +12,8 @@ function freshDefault() {
     weapon: 'bow',
     ownedBodies: ['cardboard'],
     ownedWeapons: ['bow'],
+    unlockedParts: [], // special boss-drop parts that gate some upgrades
+    muted: false,
   };
 }
 
@@ -81,6 +83,19 @@ export const Player = {
 
   nextLevel() {
     data.level += 1;
+    this.save();
+  },
+
+  hasPart(id) {
+    return data.unlockedParts.includes(id);
+  },
+  unlockPart(id) {
+    if (!data.unlockedParts.includes(id)) data.unlockedParts.push(id);
+    this.save();
+  },
+
+  setMuted(m) {
+    data.muted = m;
     this.save();
   },
 

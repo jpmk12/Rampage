@@ -16,6 +16,7 @@ export const BODIES = [
     price: 8,
     health: 5,
     mount: { x: 42, y: -52 },
+    requiresPart: 'axle', // earned by beating Big Chief Gloop (Level 1 boss)
   },
   {
     id: 'iron',
