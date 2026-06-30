@@ -16,6 +16,16 @@ function freshDefault() {
     turrets: 0, // bolt-on top turrets earned from mega enemies
     muted: false,
     littleKid: false, // invincible mode for young players
+    // Freestyle bonus-round arsenal — accumulates and persists across replays.
+    freestyle: freshFreestyle(),
+  };
+}
+
+export function freshFreestyle() {
+  return {
+    guns: 1, spread: 0, rockets: 0, missiles: 0, bombs: 0,
+    fireRate: 0, power: 0, heart: 0,
+    runs: 0, best: 0,
   };
 }
 
@@ -106,6 +116,35 @@ export const Player = {
   setLittleKid(v) {
     data.littleKid = v;
     this.save();
+  },
+
+  // ---- freestyle bonus round ----
+  get freestyle() {
+    if (!data.freestyle) data.freestyle = freshFreestyle();
+    return data.freestyle;
+  },
+  upgradeFreestyle(type) {
+    const f = this.freestyle;
+    f[type] = (f[type] || 0) + 1;
+    this.save();
+  },
+  resetFreestyle() {
+    const keep = this.freestyle;
+    data.freestyle = freshFreestyle();
+    data.freestyle.runs = keep.runs || 0;
+    data.freestyle.best = keep.best || 0;
+    this.save();
+  },
+  freestyleRun() {
+    this.freestyle.runs = (this.freestyle.runs || 0) + 1;
+    this.save();
+  },
+  setFreestyleBest(score) {
+    const f = this.freestyle;
+    if (score > (f.best || 0)) {
+      f.best = score;
+      this.save();
+    }
   },
 
   // Returns true if a turret was added, false if already at the cap.

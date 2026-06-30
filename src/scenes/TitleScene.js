@@ -77,19 +77,25 @@ export default class TitleScene extends Phaser.Scene {
 
   buildButtons() {
     const cont = Player.state.level > 1;
-    this.bigButton(GAME_WIDTH / 2, 320, cont ? `PLAY  ▶   (Level ${Player.state.level})` : 'PLAY  ▶', 0x39b54a, () => {
+    this.bigButton(GAME_WIDTH / 2, 296, cont ? `PLAY  ▶   (Level ${Player.state.level})` : 'PLAY  ▶', 0x39b54a, () => {
       this.cameras.main.fadeOut(260, 27, 29, 42);
       this.time.delayedCall(270, () => this.scene.start('Game'));
     });
 
+    // Freestyle bonus round
+    this.bigButton(GAME_WIDTH / 2, 360, '⚡ FREESTYLE', 0xe08a2a, () => {
+      this.cameras.main.fadeOut(260, 27, 29, 42);
+      this.time.delayedCall(270, () => this.scene.start('Game', { freestyle: true }));
+    });
+
     // Kid Mode (invincible) toggle
-    this.kidBtn = this.smallButton(GAME_WIDTH / 2, 392, this.kidLabel(), () => {
+    this.kidBtn = this.smallButton(GAME_WIDTH / 2, 412, this.kidLabel(), () => {
       Player.setLittleKid(!Player.state.littleKid);
       this.kidBtn.setText(this.kidLabel());
     });
 
     if (cont) {
-      this.smallButton(GAME_WIDTH / 2, 430, 'New Game', () => {
+      this.smallButton(GAME_WIDTH / 2, 446, 'New Game', () => {
         Player.reset();
         this.scene.restart();
       });

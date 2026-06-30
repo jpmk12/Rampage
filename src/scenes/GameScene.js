@@ -17,6 +17,7 @@ import {
 import { Player } from '../state/PlayerState.js';
 import { getBody, getWeapon } from '../data/catalog.js';
 import { pickEnemyType } from '../data/enemies.js';
+import { pickPickup } from '../data/freestyle.js';
 import { getLevel, LAST_LEVEL } from '../data/levels.js';
 import { buildCar, muzzleFor, addTurret } from '../entities/Car.js';
 import { sound } from '../audio/Sound.js';
@@ -54,20 +55,31 @@ export default class GameScene extends Phaser.Scene {
     super('Game');
   }
 
-  create() {
+  create(data) {
     const profile = Player.state;
-    this.level = profile.level;
-    this.levelCfg = getLevel(this.level);
-    this.levelId = this.levelCfg.id;
-    this.miniSpec = { ...this.levelCfg.mini, role: 'mini', x: 740, projTex: this.levelCfg.boss.projTex };
-    this.bossSpec = { ...this.levelCfg.boss, role: 'boss', x: 700 };
+    this.freestyle = !!(data && data.freestyle);
+
+    if (this.freestyle) {
+      this.fs = Player.freestyle;
+      this.levelId = ((this.fs.runs || 0) % LAST_LEVEL) + 1; // rotate biome for variety
+      this.level = this.levelId;
+      this.levelCfg = getLevel(this.levelId);
+      this.score = 0;
+      this.maxHealth = 5 + (this.fs.heart || 0);
+    } else {
+      this.level = profile.level;
+      this.levelCfg = getLevel(this.level);
+      this.levelId = this.levelCfg.id;
+      this.miniSpec = { ...this.levelCfg.mini, role: 'mini', x: 740, projTex: this.levelCfg.boss.projTex };
+      this.bossSpec = { ...this.levelCfg.boss, role: 'boss', x: 700 };
+      this.maxHealth = getBody(profile.body).health;
+      this.levelStartScrap = profile.scrap;
+    }
     this.weapon = getWeapon(profile.weapon);
-    this.maxHealth = getBody(profile.body).health;
     this.health = this.maxHealth;
-    this.levelStartScrap = profile.scrap;
 
     this.state = 'playing';
-    this.phase = 'travel'; // travel -> miniboss -> boss
+    this.phase = 'travel'; // travel -> miniboss -> boss (campaign only)
     this.distance = 0;
     this.boss = null;
 
@@ -212,10 +224,31 @@ export default class GameScene extends Phaser.Scene {
     this.carShadow = this.add
       .ellipse(CAR.x, CAR.groundY + 4, 96, 22, 0x000000, 0.22)
       .setDepth(4);
-    this.car = buildCar(this, CAR.x, CAR.groundY, profile.body, profile.weapon, profile.turrets);
+    if (this.freestyle) {
+      // a big tank bristling with guns that grows with the arsenal
+      const guns = Math.min(6, 1 + this.fsTotalWeapons());
+      this.car = buildCar(this, CAR.x, CAR.groundY, 'tank', 'cannon', guns);
+    } else {
+      this.car = buildCar(this, CAR.x, CAR.groundY, profile.body, profile.weapon, profile.turrets);
+    }
     this.car.setDepth(5);
     this.weaponSprite = this.car.getData('weaponSprite');
     this.lastTurretAt = 0;
+  }
+
+  fsTotalWeapons() {
+    const f = this.fs;
+    return (f.guns || 0) + (f.spread || 0) + (f.rockets || 0) + (f.missiles || 0) + (f.bombs || 0);
+  }
+
+  // Rebuild the car so its visible gun count matches the arsenal.
+  refreshFreestyleCar() {
+    const y = this.car.y;
+    this.car.destroy();
+    const guns = Math.min(6, 1 + this.fsTotalWeapons());
+    this.car = buildCar(this, CAR.x, y, 'tank', 'cannon', guns);
+    this.car.setDepth(5);
+    this.weaponSprite = this.car.getData('weaponSprite');
   }
 
   buildGroups() {
@@ -225,6 +258,7 @@ export default class GameScene extends Phaser.Scene {
     this.enemyShots = this.physics.add.group();
     this.scraps = this.add.group();
     this.hazards = this.add.group();
+    this.pickups = this.add.group();
     this.lastFireAt = 0;
   }
 
@@ -246,6 +280,8 @@ export default class GameScene extends Phaser.Scene {
     this.input.on('pointerdown', (p) => {
       if (this.muteHit(p)) return;
       if (this.state === 'over') {
+        // freestyle shows its own buttons; campaign game-over restarts on tap
+        if (this.freestyle) return;
         this.cameras.main.fadeOut(240, 27, 29, 42);
         this.time.delayedCall(250, () => this.scene.restart());
         return;
@@ -276,7 +312,11 @@ export default class GameScene extends Phaser.Scene {
       strokeThickness: 4,
     };
     this.add
-      .text(16, 12, `Level ${this.levelId}: ${this.levelCfg.name}`, { ...style, fontSize: '24px' })
+      .text(16, 12, this.freestyle ? '⚡ FREESTYLE' : `Level ${this.levelId}: ${this.levelCfg.name}`, {
+        ...style,
+        fontSize: '24px',
+        color: this.freestyle ? '#ffd34d' : '#ffffff',
+      })
       .setDepth(20);
     this.add
       .text(16, 44, 'Aim: ↑/↓ or drag right   Jump: Space or tap left', {
@@ -303,17 +343,34 @@ export default class GameScene extends Phaser.Scene {
         .setDepth(20);
     }
 
-    this.add.image(GAME_WIDTH - 120, 26, 'scrap').setScale(1.1).setDepth(20);
-    this.scrapText = this.add
-      .text(GAME_WIDTH - 104, 14, String(Player.state.scrap), { ...style, fontSize: '26px' })
-      .setDepth(20);
+    if (this.freestyle) {
+      // score (top-right) + live arsenal tally (top-center)
+      this.scoreText = this.add
+        .text(GAME_WIDTH - 16, 12, 'SCORE 0', { ...style, fontSize: '26px', color: '#ffd34d' })
+        .setOrigin(1, 0)
+        .setDepth(20);
+      this.add
+        .text(GAME_WIDTH - 16, 44, `Best ${this.fs.best || 0}`, { ...style, fontSize: '14px', color: '#bfe6ff' })
+        .setOrigin(1, 0)
+        .setDepth(20);
+      this.arsenalText = this.add
+        .text(GAME_WIDTH / 2, 16, '', { ...style, fontSize: '15px', color: '#ffffff' })
+        .setOrigin(0.5, 0)
+        .setDepth(20);
+      this.refreshArsenalText();
+    } else {
+      this.add.image(GAME_WIDTH - 120, 26, 'scrap').setScale(1.1).setDepth(20);
+      this.scrapText = this.add
+        .text(GAME_WIDTH - 104, 14, String(Player.state.scrap), { ...style, fontSize: '26px' })
+        .setDepth(20);
 
-    this.add.rectangle(GAME_WIDTH / 2, 24, 260, 12, 0x1b1d2a, 0.55).setDepth(20);
-    this.progressFill = this.add
-      .rectangle(GAME_WIDTH / 2 - 128, 24, 4, 8, 0x6fd06a, 1)
-      .setOrigin(0, 0.5)
-      .setDepth(20);
-    this.add.image(GAME_WIDTH / 2 + 132, 24, 'flag').setScale(0.18).setDepth(20);
+      this.add.rectangle(GAME_WIDTH / 2, 24, 260, 12, 0x1b1d2a, 0.55).setDepth(20);
+      this.progressFill = this.add
+        .rectangle(GAME_WIDTH / 2 - 128, 24, 4, 8, 0x6fd06a, 1)
+        .setOrigin(0, 0.5)
+        .setDepth(20);
+      this.add.image(GAME_WIDTH / 2 + 132, 24, 'flag').setScale(0.18).setDepth(20);
+    }
 
     // subtle touch hints
     const hint = { fontFamily: FONTS.ui, fontSize: '13px', color: '#ffffff' };
@@ -382,19 +439,25 @@ export default class GameScene extends Phaser.Scene {
 
   update(time, delta) {
     if (this.state === 'playing') {
-      if (this.phase === 'travel') {
+      if (this.freestyle) {
         this.scrollWorld(delta);
-        this.advanceLevel(delta);
-        this.maybeSpawnGoblin(time);
-        if (HAZARDS_ENABLED) this.maybeSpawnHazard(time);
-        this.maybeSpawnMega(time);
-      } else if (this.phase === 'horde') {
-        this.updateHorde(time);
+        this.freestyleSpawns(time);
+        this.fireArsenal(time);
       } else {
-        this.updateBoss(time, delta);
+        if (this.phase === 'travel') {
+          this.scrollWorld(delta);
+          this.advanceLevel(delta);
+          this.maybeSpawnGoblin(time);
+          if (HAZARDS_ENABLED) this.maybeSpawnHazard(time);
+          this.maybeSpawnMega(time);
+        } else if (this.phase === 'horde') {
+          this.updateHorde(time);
+        } else {
+          this.updateBoss(time, delta);
+        }
+        this.handleFiring(time);
+        this.fireTurrets(time);
       }
-      this.handleFiring(time);
-      this.fireTurrets(time);
       this.emitDust(time);
     }
     this.updateClouds(delta);
@@ -404,6 +467,8 @@ export default class GameScene extends Phaser.Scene {
     this.updateEnemyShots();
     this.updateScraps(delta);
     this.updateHazards(delta);
+    this.updatePickups(delta);
+    this.updateHoming(delta);
     this.cullBullets();
   }
 
@@ -543,6 +608,262 @@ export default class GameScene extends Phaser.Scene {
     if (type.lobs) e.setData('nextLob', this.time.now + Phaser.Math.Between(600, 1200));
     if (horde) e.setData('horde', true);
     return e;
+  }
+
+  // ---- freestyle bonus round -------------------------------------------
+
+  freestyleSpawns(time) {
+    if (this.fsStart === undefined) {
+      this.fsStart = time;
+      this.nextFsSpawn = time + 500;
+      this.nextFsMega = time + 8000;
+    }
+    const mins = (time - this.fsStart) / 60000;
+    const gap = Math.max(150, 700 - mins * 220);
+    if (time >= this.nextFsSpawn) {
+      this.spawnEnemy(pickEnemyType(Math.random));
+      if (Math.random() < Math.min(0.65, mins * 0.35)) this.spawnEnemy(pickEnemyType(Math.random));
+      this.nextFsSpawn = time + Phaser.Math.Between(gap, gap + 220);
+    }
+    if (time >= this.nextFsMega) {
+      this.spawnFreestyleMega();
+      this.nextFsMega = time + Phaser.Math.Between(11000, 17000);
+    }
+  }
+
+  spawnFreestyleMega() {
+    const hp = 22 + Math.floor((this.score || 0) * 0.6);
+    const e = this.goblins.create(GAME_WIDTH + 90, GROUND_TOP_Y + 2, `brute-${this.levelId}`);
+    e.setOrigin(0.5, 1).setScale(MEGA.scale);
+    e.body.setAllowGravity(false);
+    e.setVelocityX(-MEGA.speed);
+    e.setData('type', { lane: 'ground', clearH: 999, mega: true, speed: MEGA.speed });
+    e.setData('hp', hp);
+    e.setData('maxHp', hp);
+    e.setData('seed', Math.random() * Math.PI * 2);
+    const bg = this.add.rectangle(e.x, 0, 72, 9, 0x1b1d2a, 0.7).setDepth(7);
+    const fill = this.add.rectangle(e.x - 34, 0, 68, 5, 0xe2483a, 1).setOrigin(0, 0.5).setDepth(8);
+    e.setData('hpbar', { bg, fill });
+  }
+
+  // Fire every weapon in the arsenal at once.
+  fireArsenal(time) {
+    const f = this.fs;
+    const rate = 1 / (1 + 0.14 * (f.fireRate || 0));
+    const dmg = 1 + (f.power || 0);
+    let fired = false;
+
+    if ((f.guns || 0) > 0 && time - (this.tGun || 0) > 170 * rate) {
+      this.tGun = time;
+      const n = f.guns;
+      for (let i = 0; i < n; i++) this.fireBolt(this.aim + (i - (n - 1) / 2) * 0.05, 'shot-crossbow', 840, dmg, 1);
+      fired = true;
+    }
+    if ((f.spread || 0) > 0 && time - (this.tSpread || 0) > 520 * rate) {
+      this.tSpread = time;
+      const n = 2 + f.spread;
+      for (let i = 0; i < n; i++) this.fireBolt(this.aim + (i - (n - 1) / 2) * 0.16, 'shot-bow', 700, dmg, 1);
+      fired = true;
+    }
+    if ((f.rockets || 0) > 0 && time - (this.tRocket || 0) > 680 * rate) {
+      this.tRocket = time;
+      for (let i = 0; i < f.rockets; i++) this.fireBolt(this.aim + (i - (f.rockets - 1) / 2) * 0.05, 'shot-rocket', 640, dmg * 2, 1.3);
+      fired = true;
+    }
+    if ((f.missiles || 0) > 0 && time - (this.tMissile || 0) > 900 * rate) {
+      this.tMissile = time;
+      for (let i = 0; i < f.missiles; i++) {
+        const b = this.fireBolt(-0.5, 'shot-rocket', 520, dmg * 2, 1.3);
+        if (b) b.setData('homing', true).setTint(0xc060ff);
+      }
+    }
+    if ((f.bombs || 0) > 0 && time - (this.tBomb || 0) > 1000 * rate) {
+      this.tBomb = time;
+      for (let i = 0; i < f.bombs; i++) this.lobBomb(dmg * 3);
+    }
+    if (fired) sound.shoot();
+  }
+
+  fireBolt(angle, tex, speed, dmg, scale) {
+    const mx = this.car.x + 46;
+    const my = this.car.y - 48;
+    const b = this.bullets.create(mx, my, tex);
+    if (!b) return null;
+    b.body.setAllowGravity(false);
+    b.setRotation(angle).setScale(scale || 1).setDepth(4);
+    b.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
+    b.setData('dmg', dmg);
+    return b;
+  }
+
+  lobBomb(dmg) {
+    const b = this.bullets.create(this.car.x + 40, this.car.y - 60, 'enemy-rock');
+    b.setTint(0x33383f).setScale(1.3).setDepth(4);
+    b.body.setAllowGravity(true);
+    b.body.setGravityY(700);
+    b.setVelocity(360 + Math.random() * 120, -380);
+    b.setData('dmg', dmg);
+    b.setData('bomb', true);
+  }
+
+  explodeAt(x, y, radius, dmg) {
+    this.poof(x, y, 0xffd24d);
+    this.poof(x, y - 10, 0xff7a3a);
+    sound.explode();
+    this.cameras.main.shake(120, 0.004);
+    this.goblins.children.iterate((e) => {
+      if (e && Phaser.Math.Distance.Between(x, y, e.x, e.y - 20) < radius) this.hitEnemy(e, dmg);
+      return true;
+    });
+  }
+
+  updateHoming(delta) {
+    this.bullets.children.iterate((b) => {
+      if (!b || !b.getData('homing')) return true;
+      const t = this.nearestGoblin(b.x, b.y);
+      if (t) {
+        const target = Phaser.Math.Angle.Between(b.x, b.y, t.x, t.y - 20);
+        const v = b.body.velocity;
+        const spd = Math.hypot(v.x, v.y) || 540;
+        const cur = Math.atan2(v.y, v.x);
+        const na = Phaser.Math.Angle.RotateTo(cur, target, 0.005 * delta);
+        b.setVelocity(Math.cos(na) * spd, Math.sin(na) * spd);
+        b.setRotation(na);
+      }
+      return true;
+    });
+  }
+
+  nearestGoblin(x, y) {
+    let best = null;
+    let bd = 1e9;
+    this.goblins.children.iterate((e) => {
+      if (e) {
+        const d = Phaser.Math.Distance.Between(x, y, e.x, e.y);
+        if (d < bd) { bd = d; best = e; }
+      }
+      return true;
+    });
+    return best;
+  }
+
+  dropPickup(x, y) {
+    const pk = pickPickup(Math.random);
+    const c = this.pickups.create(x, Math.min(y, GROUND_TOP_Y - 20), 'crate');
+    c.setTint(pk.tint).setScale(1.15).setDepth(5);
+    c.setData('pk', pk);
+  }
+
+  updatePickups(delta) {
+    if (!this.freestyle) return;
+    const cx = this.car.x;
+    const cy = this.carCenterY();
+    this.pickups.children.iterate((p) => {
+      if (!p) return true;
+      const d = Phaser.Math.Distance.Between(p.x, p.y, cx, cy);
+      if (d < 46) {
+        this.collectPickup(p);
+        return true;
+      }
+      if (d < 240) {
+        const k = Math.min(1, 0.02 * delta);
+        p.x += (cx - p.x) * k;
+        p.y += (cy - p.y) * k;
+      } else {
+        p.x -= WORLD_SCROLL * delta;
+      }
+      p.rotation += 0.004 * delta;
+      if (p.x < -40) p.destroy();
+      return true;
+    });
+  }
+
+  collectPickup(p) {
+    const pk = p.getData('pk');
+    p.destroy();
+    Player.upgradeFreestyle(pk.type);
+    this.fs = Player.freestyle;
+    sound.pickup();
+    const color = '#' + pk.tint.toString(16).padStart(6, '0');
+    this.floatLabel(this.car.x, this.car.y - 96, pk.label, color);
+    this.refreshArsenalText();
+    if (pk.type === 'heart') {
+      this.maxHealth += 1;
+      this.health = this.maxHealth;
+      this.rebuildHearts();
+    } else if (['guns', 'spread', 'rockets', 'missiles', 'bombs'].includes(pk.type)) {
+      this.refreshFreestyleCar();
+    }
+  }
+
+  floatLabel(x, y, text, color) {
+    const t = this.add
+      .text(x, y, text, { fontFamily: FONTS.display, fontSize: '24px', color, stroke: '#1b1d2a', strokeThickness: 5 })
+      .setOrigin(0.5)
+      .setDepth(22);
+    this.tweens.add({ targets: t, y: y - 44, alpha: 0, duration: 950, ease: 'Quad.easeOut', onComplete: () => t.destroy() });
+  }
+
+  refreshArsenalText() {
+    if (!this.arsenalText) return;
+    const f = this.fs;
+    const parts = [];
+    if (f.guns) parts.push(`🔫${f.guns}`);
+    if (f.spread) parts.push(`◣${f.spread}`);
+    if (f.rockets) parts.push(`🚀${f.rockets}`);
+    if (f.missiles) parts.push(`🎯${f.missiles}`);
+    if (f.bombs) parts.push(`💣${f.bombs}`);
+    if (f.fireRate) parts.push(`⚡${f.fireRate}`);
+    if (f.power) parts.push(`💥${f.power}`);
+    this.arsenalText.setText(parts.join('   '));
+  }
+
+  rebuildHearts() {
+    this.hearts.forEach((h) => h.destroy());
+    this.hearts = [];
+    const shown = Math.min(this.maxHealth, 10);
+    for (let i = 0; i < shown; i++) this.hearts.push(this.add.image(28 + i * 30, 84, 'heart').setDepth(20));
+    this.renderHearts();
+  }
+
+  freestyleOver() {
+    this.state = 'over';
+    this.aiming = false;
+    sound.stopMusic();
+    sound.lose();
+    Player.setFreestyleBest(this.score);
+    Player.freestyleRun();
+    this.freezeEnemies();
+
+    const cx = GAME_WIDTH / 2;
+    const cy = GAME_HEIGHT / 2;
+    this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x1b1d2a, 0.62).setDepth(30);
+    this.bannerText(cx, cy - 96, 'BONUS ROUND OVER', '#ffd34d', 40);
+    this.bannerText(cx, cy - 44, `You smashed ${this.score}!  (Best ${this.fs.best})`, '#ffffff', 22);
+    this.bannerText(cx, cy - 8, 'Your arsenal is saved 💪', '#9fe6a0', 18);
+
+    this.overButton(cx, cy + 34, 'Replay (keep arsenal)', 0x39b54a, () =>
+      this.scene.restart({ freestyle: true })
+    );
+    this.overButton(cx, cy + 86, 'Start fresh arsenal', 0x7a5a8a, () => {
+      Player.resetFreestyle();
+      this.scene.restart({ freestyle: true });
+    });
+    this.overButton(cx, cy + 138, 'Main Menu', 0x4a78c0, () => this.scene.start('Title'));
+  }
+
+  overButton(x, y, label, color, onClick) {
+    const c = this.add.container(x, y).setDepth(32);
+    const bg = this.add.rectangle(0, 0, 300, 44, color, 1).setStrokeStyle(3, 0x1b1d2a);
+    bg.setInteractive({ useHandCursor: true });
+    const t = this.add
+      .text(0, 0, label, { fontFamily: FONTS.ui, fontSize: '20px', color: '#ffffff', stroke: '#1b1d2a', strokeThickness: 3 })
+      .setOrigin(0.5);
+    c.add([bg, t]);
+    bg.on('pointerover', () => c.setScale(1.05));
+    bg.on('pointerout', () => c.setScale(1));
+    bg.on('pointerdown', onClick);
+    return c;
   }
 
   // Rare, big, tanky enemy. Defeating it bolts a turret onto the car.
@@ -699,7 +1020,17 @@ export default class GameScene extends Phaser.Scene {
 
   onBulletHit(bullet, goblin) {
     const dmg = bullet.getData('dmg') || this.weapon.damage;
+    if (bullet.getData('bomb')) {
+      this.explodeAt(bullet.x, bullet.y, 95, dmg);
+      bullet.destroy();
+      return;
+    }
     bullet.destroy();
+    this.hitEnemy(goblin, dmg);
+  }
+
+  hitEnemy(goblin, dmg) {
+    if (!goblin.active) return;
     const hp = goblin.getData('hp') - dmg;
     if (hp > 0) {
       goblin.setData('hp', hp);
@@ -717,6 +1048,17 @@ export default class GameScene extends Phaser.Scene {
     sound.defeat();
     this.poof(goblin.x, yy, COLORS.goblin);
     if (type.mega) this.poof(goblin.x, yy, 0xffe14d);
+
+    if (this.freestyle) {
+      this.score += type.mega ? 5 : 1;
+      this.scoreText.setText('SCORE ' + this.score);
+      Player.setFreestyleBest(this.score);
+      if (type.mega) this.dropPickup(goblin.x, yy);
+      else if (Math.random() < 0.18) this.dropPickup(goblin.x, yy);
+      this.removeEnemy(goblin);
+      return;
+    }
+
     for (let i = 0; i < (type.scrap || 1); i++) {
       this.spawnScrap(goblin.x + Phaser.Math.Between(-12, 12), yy + Phaser.Math.Between(-8, 8));
     }
@@ -799,7 +1141,10 @@ export default class GameScene extends Phaser.Scene {
       onComplete: () => this.car && this.car.setAlpha(1),
     });
 
-    if (this.health <= 0) this.gameOver();
+    if (this.health <= 0) {
+      if (this.freestyle) this.freestyleOver();
+      else this.gameOver();
+    }
   }
 
   renderHearts() {
@@ -1211,6 +1556,12 @@ export default class GameScene extends Phaser.Scene {
   cullBullets() {
     this.bullets.children.iterate((b) => {
       if (!b) return true;
+      // bombs explode when they hit the ground
+      if (b.getData('bomb') && b.y > GROUND_TOP_Y - 6) {
+        this.explodeAt(b.x, GROUND_TOP_Y - 8, 95, b.getData('dmg') || 1);
+        b.destroy();
+        return true;
+      }
       if (b.x > GAME_WIDTH + 40 || b.x < -40 || b.y < -40 || b.y > GAME_HEIGHT + 40) b.destroy();
       return true;
     });

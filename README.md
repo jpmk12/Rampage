@@ -120,6 +120,14 @@ swamp spores, blowing sand, falling snow, rising embers), a sun/moon and
 drifting clouds, wheel dust, muzzle flashes, a damage flash, and smooth scene
 fades.
 
+**Freestyle bonus round (done):** an action sandbox for the power-up crowd,
+launched from the title screen. Endless escalating waves; defeated enemies drop
+weapon and boost pickups (**+gun, +spread, +rocket, +missile, +bomb, +fire
+rate, +power, +heart**) that stack onto your tank. By the end you're a rolling
+gun-tower firing a wall of bolts, rockets, homing missiles, and lobbed bombs.
+Your **arsenal is saved and persists across replays** (Replay keeps it, or Start
+Fresh resets), so you just keep getting more powerful. Score + best are tracked.
+
 **Real display fonts (done):** the title, HUD, buttons, and banners now use
 chunky comic-book fonts (**Bangers** for headlines, **Luckiest Guy** for UI)
 instead of the system font — a big step toward a finished, "real game" look.

@@ -30,8 +30,10 @@ export default class PauseScene extends Phaser.Scene {
       this.scene.stop();
     });
     this.button(cx, cy + 30, 'Restart Level', 0x4a78c0, () => {
+      const g = this.scene.get('Game');
+      const freestyle = !!(g && g.freestyle);
       this.scene.stop('Game');
-      this.scene.start('Game');
+      this.scene.start('Game', { freestyle });
     });
     this.button(cx, cy + 96, 'Main Menu', 0x7a5a8a, () => {
       this.scene.stop('Game');

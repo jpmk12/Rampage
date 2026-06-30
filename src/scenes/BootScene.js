@@ -57,6 +57,7 @@ export default class BootScene extends Phaser.Scene {
     this.makeCloud('cloud');
     this.makeSun('sun');
     this.makeFlake('flake');
+    this.makeCrate('crate');
     this.makeHeart('heart', true);
     this.makeHeart('heart-empty', false);
     this.makeDrummer('drummer');
@@ -885,6 +886,33 @@ export default class BootScene extends Phaser.Scene {
     g.fillStyle(0xffffff, 1);
     g.fillRoundedRect(30, 40, 90, 18, 9);
     g.generateTexture(key, W, H);
+    g.destroy();
+  }
+
+  // Freestyle power-up crate (tinted per pickup type at use).
+  makeCrate(key) {
+    if (this.textures.exists(key)) return;
+    const S = 30;
+    const g = this.add.graphics();
+    g.fillStyle(0xffffff, 1);
+    g.fillRoundedRect(2, 2, 26, 26, 5);
+    g.lineStyle(3, 0x000000, 0.35);
+    g.strokeRoundedRect(2, 2, 26, 26, 5);
+    // a star so it reads as a pickup
+    g.fillStyle(0xffffff, 1);
+    const cx = 15, cy = 15, r = 9;
+    g.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const ang = (Math.PI / 5) * i - Math.PI / 2;
+      const rr = i % 2 === 0 ? r : r * 0.45;
+      const x = cx + Math.cos(ang) * rr;
+      const y = cy + Math.sin(ang) * rr;
+      i === 0 ? g.moveTo(x, y) : g.lineTo(x, y);
+    }
+    g.closePath();
+    g.fillStyle(0x000000, 0.25);
+    g.fillPath();
+    g.generateTexture(key, S, S);
     g.destroy();
   }
 
