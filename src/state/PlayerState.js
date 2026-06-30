@@ -135,6 +135,15 @@ export const Player = {
     data.freestyle.best = keep.best || 0;
     this.save();
   },
+  // True once the player has built up any freestyle arsenal/perks worth wiping.
+  hasFreestyleProgress() {
+    const f = this.freestyle;
+    return (
+      (f.guns || 0) > 1 || (f.spread || 0) > 0 || (f.rockets || 0) > 0 ||
+      (f.missiles || 0) > 0 || (f.bombs || 0) > 0 || (f.fireRate || 0) > 0 ||
+      (f.power || 0) > 0 || (f.heart || 0) > 0
+    );
+  },
   freestyleRun() {
     this.freestyle.runs = (this.freestyle.runs || 0) + 1;
     this.save();

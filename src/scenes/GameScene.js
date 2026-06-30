@@ -28,6 +28,18 @@ const BOSS_THROW_EVERY = 1600; // ms between boss projectile throws
 // Hazards you must jump over are disabled for now (per request).
 const HAZARDS_ENABLED = false;
 
+// Freestyle: each weapon fires at most this many projectiles per volley.
+// Pickups collected beyond the cap stop adding projectiles and instead LEVEL
+// UP that weapon — every shot hits harder (and a touch bigger) — so the screen
+// never fills with hundreds of bullets no matter how many crates you grab.
+const WEAPON_CAP = { guns: 6, spread: 5, rockets: 4, missiles: 3, bombs: 2 };
+const OVERFLOW_DMG = 0.5; // per-pickup bonus damage multiplier past the cap
+const OVERFLOW_SIZE = 0.05; // per-pickup projectile size bump past the cap (capped)
+// Fire-rate also has a ceiling: past this, shots don't get any faster (which
+// would refill the screen) — extra fire-rate pickups boost damage instead.
+const FIRE_RATE_CAP = 8;
+const FIRE_RATE_OVER_DMG = 0.12; // per-pickup damage past the fire-rate cap
+
 // Bolt-on turrets (earned from mega enemies) fire straight ahead.
 const TURRET_COOLDOWN = 300; // ms between turret volleys
 const TURRET_SPEED = 780;
@@ -236,15 +248,49 @@ export default class GameScene extends Phaser.Scene {
     this.lastTurretAt = 0;
   }
 
+  // ---- arsenal scaling (capped projectiles + overflow upgrades) ----
+
+  // Projectiles a weapon actually fires, clamped to its cap.
+  fsCount(type) {
+    return Math.min(WEAPON_CAP[type], this.fs[type] || 0);
+  }
+  // Pickups collected past a weapon's cap — its "upgrade level".
+  fsOverflow(type) {
+    return Math.max(0, (this.fs[type] || 0) - WEAPON_CAP[type]);
+  }
+  // Damage multiplier a weapon earns from its overflow upgrades.
+  fsBoost(type) {
+    return 1 + this.fsOverflow(type) * OVERFLOW_DMG;
+  }
+  // Modest, capped projectile size bump so upgraded shots read as "stronger".
+  fsSizeBoost(type) {
+    return 1 + Math.min(0.8, this.fsOverflow(type) * OVERFLOW_SIZE);
+  }
+
+  // Capped projectile count summed across weapons (drives the car visual).
   fsTotalWeapons() {
-    const f = this.fs;
-    return (f.guns || 0) + (f.spread || 0) + (f.rockets || 0) + (f.missiles || 0) + (f.bombs || 0);
+    return (
+      this.fsCount('guns') + this.fsCount('spread') + this.fsCount('rockets') +
+      this.fsCount('missiles') + this.fsCount('bombs')
+    );
+  }
+  // Total overflow upgrades across all weapons.
+  fsTotalOverflow() {
+    return (
+      this.fsOverflow('guns') + this.fsOverflow('spread') + this.fsOverflow('rockets') +
+      this.fsOverflow('missiles') + this.fsOverflow('bombs')
+    );
   }
 
   // Overall power index — drives how many/how tough the enemies and bosses get.
+  // Capped weapon counts plus a gently-damped overflow term, so enemies keep
+  // pace as you level up without exploding the way raw pickup counts did.
   fsPower() {
     const f = this.fs;
-    return this.fsTotalWeapons() + (f.power || 0) + (f.fireRate || 0) + (f.heart || 0);
+    return (
+      this.fsTotalWeapons() + (f.power || 0) + (f.fireRate || 0) + (f.heart || 0) +
+      this.fsTotalOverflow() * 0.15
+    );
   }
 
   fsHpMult() {
@@ -293,7 +339,7 @@ export default class GameScene extends Phaser.Scene {
         // freestyle shows its own buttons; campaign game-over restarts on tap
         if (this.freestyle) return;
         this.cameras.main.fadeOut(240, 27, 29, 42);
-        this.time.delayedCall(250, () => this.scene.restart());
+        this.time.delayedCall(250, () => this.scene.restart({ freestyle: false }));
         return;
       }
       if (this.state !== 'playing') return;
@@ -678,40 +724,59 @@ export default class GameScene extends Phaser.Scene {
     e.setData('hpbar', { bg, fill });
   }
 
-  // Fire every weapon in the arsenal at once.
+  // Fire every weapon in the arsenal at once. Each weapon fires a capped number
+  // of projectiles; pickups beyond the cap make that weapon's shots hit harder
+  // (fsBoost) and a little bigger (fsSizeBoost) rather than adding more bullets.
   fireArsenal(time) {
     const f = this.fs;
-    const rate = 1 / (1 + 0.14 * (f.fireRate || 0));
-    const dmg = 1 + (f.power || 0);
+    // Fire cadence speeds up with fire-rate but only to a floor; beyond the cap
+    // the surplus turns into extra damage so the screen doesn't refill.
+    const frEff = Math.min(FIRE_RATE_CAP, f.fireRate || 0);
+    const frOver = Math.max(0, (f.fireRate || 0) - FIRE_RATE_CAP);
+    const rate = 1 / (1 + 0.14 * frEff);
+    const base = (1 + (f.power || 0)) * (1 + frOver * FIRE_RATE_OVER_DMG);
     let fired = false;
 
-    if ((f.guns || 0) > 0 && time - (this.tGun || 0) > 170 * rate) {
+    const gN = this.fsCount('guns');
+    if (gN > 0 && time - (this.tGun || 0) > 170 * rate) {
       this.tGun = time;
-      const n = f.guns;
-      for (let i = 0; i < n; i++) this.fireBolt(this.aim + (i - (n - 1) / 2) * 0.05, 'shot-crossbow', 840, dmg, 1);
+      const dmg = base * this.fsBoost('guns');
+      const sc = this.fsSizeBoost('guns');
+      for (let i = 0; i < gN; i++) this.fireBolt(this.aim + (i - (gN - 1) / 2) * 0.05, 'shot-crossbow', 840, dmg, sc);
       fired = true;
     }
-    if ((f.spread || 0) > 0 && time - (this.tSpread || 0) > 520 * rate) {
+    const sN = this.fsCount('spread');
+    if (sN > 0 && time - (this.tSpread || 0) > 520 * rate) {
       this.tSpread = time;
-      const n = 2 + f.spread;
-      for (let i = 0; i < n; i++) this.fireBolt(this.aim + (i - (n - 1) / 2) * 0.16, 'shot-bow', 700, dmg, 1);
+      const n = 2 + sN;
+      const dmg = base * this.fsBoost('spread');
+      const sc = this.fsSizeBoost('spread');
+      for (let i = 0; i < n; i++) this.fireBolt(this.aim + (i - (n - 1) / 2) * 0.16, 'shot-bow', 700, dmg, sc);
       fired = true;
     }
-    if ((f.rockets || 0) > 0 && time - (this.tRocket || 0) > 680 * rate) {
+    const rN = this.fsCount('rockets');
+    if (rN > 0 && time - (this.tRocket || 0) > 680 * rate) {
       this.tRocket = time;
-      for (let i = 0; i < f.rockets; i++) this.fireBolt(this.aim + (i - (f.rockets - 1) / 2) * 0.05, 'shot-rocket', 640, dmg * 2, 1.3);
+      const dmg = base * 2 * this.fsBoost('rockets');
+      const sc = 1.3 * this.fsSizeBoost('rockets');
+      for (let i = 0; i < rN; i++) this.fireBolt(this.aim + (i - (rN - 1) / 2) * 0.05, 'shot-rocket', 640, dmg, sc);
       fired = true;
     }
-    if ((f.missiles || 0) > 0 && time - (this.tMissile || 0) > 900 * rate) {
+    const mN = this.fsCount('missiles');
+    if (mN > 0 && time - (this.tMissile || 0) > 900 * rate) {
       this.tMissile = time;
-      for (let i = 0; i < f.missiles; i++) {
-        const b = this.fireBolt(-0.5, 'shot-rocket', 520, dmg * 2, 1.3);
+      const dmg = base * 2 * this.fsBoost('missiles');
+      const sc = 1.3 * this.fsSizeBoost('missiles');
+      for (let i = 0; i < mN; i++) {
+        const b = this.fireBolt(-0.5, 'shot-rocket', 520, dmg, sc);
         if (b) b.setData('homing', true).setTint(0xc060ff);
       }
     }
-    if ((f.bombs || 0) > 0 && time - (this.tBomb || 0) > 1000 * rate) {
+    const bN = this.fsCount('bombs');
+    if (bN > 0 && time - (this.tBomb || 0) > 1000 * rate) {
       this.tBomb = time;
-      for (let i = 0; i < f.bombs; i++) this.lobBomb(dmg * 3);
+      const dmg = base * 3 * this.fsBoost('bombs');
+      for (let i = 0; i < bN; i++) this.lobBomb(dmg);
     }
     if (fired) sound.shoot();
   }
@@ -839,12 +904,13 @@ export default class GameScene extends Phaser.Scene {
   refreshArsenalText() {
     if (!this.arsenalText) return;
     const f = this.fs;
+    const icon = { guns: '🔫', spread: '◣', rockets: '🚀', missiles: '🎯', bombs: '💣' };
     const parts = [];
-    if (f.guns) parts.push(`🔫${f.guns}`);
-    if (f.spread) parts.push(`◣${f.spread}`);
-    if (f.rockets) parts.push(`🚀${f.rockets}`);
-    if (f.missiles) parts.push(`🎯${f.missiles}`);
-    if (f.bombs) parts.push(`💣${f.bombs}`);
+    for (const t of ['guns', 'spread', 'rockets', 'missiles', 'bombs']) {
+      if (!(f[t] > 0)) continue;
+      const lvl = this.fsOverflow(t); // ★ shows the weapon is maxed and upgraded
+      parts.push(`${icon[t]}${this.fsCount(t)}${lvl ? `★${lvl}` : ''}`);
+    }
     if (f.fireRate) parts.push(`⚡${f.fireRate}`);
     if (f.power) parts.push(`💥${f.power}`);
     this.arsenalText.setText(parts.join('   '));

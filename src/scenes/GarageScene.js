@@ -297,7 +297,7 @@ export default class GarageScene extends Phaser.Scene {
     bg.on('pointerdown', () => {
       Player.nextLevel();
       this.cameras.main.fadeOut(240, 27, 29, 42);
-      this.time.delayedCall(250, () => this.scene.start('Game'));
+      this.time.delayedCall(250, () => this.scene.start('Game', { freestyle: false }));
     });
 
     // gentle attention pulse
