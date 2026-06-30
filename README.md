@@ -56,6 +56,10 @@ in with its own health bar. Defeat one and it bolts an extra **gun turret** onto
 the roof of your car (up to three) — each fires straight ahead for extra
 firepower, and they stick with you for the rest of the run.
 
+**End-of-level horde:** when you reach the end of a level, a **horde** of enemies
+swarms in all at once before the boss. Clear them for **bonus scrap** — with an
+extra reward for a perfect clear (defeating every last one).
+
 ## Status
 
 **Milestone 0 — Skeleton (done):** auto-scrolling parallax world, a cardboard

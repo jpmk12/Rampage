@@ -245,6 +245,8 @@ export default class GameScene extends Phaser.Scene {
         this.maybeSpawnGoblin(time);
         if (HAZARDS_ENABLED) this.maybeSpawnHazard(time);
         this.maybeSpawnMega(time);
+      } else if (this.phase === 'horde') {
+        this.updateHorde(time);
       } else {
         this.updateBoss(time, delta);
       }
@@ -270,7 +272,7 @@ export default class GameScene extends Phaser.Scene {
     this.distance += WORLD_SCROLL * delta;
     const p = Phaser.Math.Clamp(this.distance / LEVEL.length, 0, 1);
     this.progressFill.width = 4 + p * 252;
-    if (this.distance >= LEVEL.length) this.startBossSequence();
+    if (this.distance >= LEVEL.length) this.startHorde();
   }
 
   // ---- car: jump + aim --------------------------------------------------
@@ -328,26 +330,26 @@ export default class GameScene extends Phaser.Scene {
   maybeSpawnGoblin(time) {
     if (this.distance >= LEVEL.length) return;
     if (time < this.nextSpawnAt) return;
+    this.spawnEnemy(pickEnemyType(Math.random));
+    const gap = Phaser.Math.Between(this.spawnGap, this.spawnGap + 800);
+    this.nextSpawnAt = time + gap;
+  }
 
-    const type = pickEnemyType(Math.random);
-    const x = GAME_WIDTH + 50;
+  // Shared enemy factory (used by normal spawns and the end-of-level horde).
+  spawnEnemy(type, horde = false) {
+    const x = GAME_WIDTH + 50 + (horde ? Phaser.Math.Between(0, 140) : 0);
     const y = type.lane === 'air' ? CAR.groundY - 120 : GROUND_TOP_Y + 2;
-
     const e = this.goblins.create(x, y, `${type.key}-${this.levelId}`);
-    e.setOrigin(0.5, 1);
+    e.setOrigin(0.5, type.lane === 'air' ? 0.5 : 1);
     e.body.setAllowGravity(false);
     e.setVelocityX(-type.speed);
     e.setData('type', type);
     e.setData('hp', type.hp);
     e.setData('seed', Math.random() * Math.PI * 2);
-    if (type.lane === 'air') {
-      e.setOrigin(0.5, 0.5);
-      e.setData('baseY', y);
-    }
-    if (type.lobs) e.setData('nextLob', time + Phaser.Math.Between(600, 1200));
-
-    const gap = Phaser.Math.Between(this.spawnGap, this.spawnGap + 800);
-    this.nextSpawnAt = time + gap;
+    if (type.lane === 'air') e.setData('baseY', y);
+    if (type.lobs) e.setData('nextLob', this.time.now + Phaser.Math.Between(600, 1200));
+    if (horde) e.setData('horde', true);
+    return e;
   }
 
   // Rare, big, tanky enemy. Defeating it bolts a turret onto the car.
@@ -439,13 +441,17 @@ export default class GameScene extends Phaser.Scene {
         const hitsGround = type.lane !== 'air' && airborne < type.clearH;
         if (hitsAir || hitsGround) {
           this.poof(e.x, type.lane === 'air' ? e.y : e.y - 24, COLORS.goblin);
+          if (e.getData('horde')) this.hordeAlive -= 1; // crashed into us — not a kill
           this.removeEnemy(e);
           this.damageCar(COMBAT.contactDamage);
           return true;
         }
       }
 
-      if (e.x < -90) this.removeEnemy(e);
+      if (e.x < -90) {
+        if (e.getData('horde')) this.hordeAlive -= 1; // slipped past — not a kill
+        this.removeEnemy(e);
+      }
       return true;
     });
   }
@@ -512,6 +518,10 @@ export default class GameScene extends Phaser.Scene {
     if (type.mega) this.poof(goblin.x, yy, 0xffe14d);
     for (let i = 0; i < (type.scrap || 1); i++) {
       this.spawnScrap(goblin.x + Phaser.Math.Between(-12, 12), yy + Phaser.Math.Between(-8, 8));
+    }
+    if (goblin.getData('horde')) {
+      this.hordeDefeated += 1;
+      this.hordeAlive -= 1;
     }
     this.removeEnemy(goblin);
     if (type.mega) this.rewardTurret();
@@ -662,6 +672,48 @@ export default class GameScene extends Phaser.Scene {
       if (h.x < -60) h.destroy();
       return true;
     });
+  }
+
+  // ---- end-of-level horde ----------------------------------------------
+
+  startHorde() {
+    this.phase = 'horde';
+    this.progressFill.width = 256;
+    this.hordeTotal = 6 + this.level; // grows a little each level
+    this.hordeSpawned = 0;
+    this.hordeAlive = 0;
+    this.hordeDefeated = 0;
+    this.hordeDone = false;
+    this.nextHordeSpawnAt = this.time.now + 600;
+    this.bannerFlash('🔥  HORDE INCOMING!  🔥', '#ff7a7a');
+  }
+
+  updateHorde(time) {
+    // stagger the wave in
+    if (this.hordeSpawned < this.hordeTotal && time >= this.nextHordeSpawnAt) {
+      this.spawnEnemy(pickEnemyType(Math.random), true);
+      this.hordeSpawned += 1;
+      this.hordeAlive += 1;
+      this.nextHordeSpawnAt = time + Phaser.Math.Between(220, 360);
+    }
+    // all spawned and none left → clear
+    if (!this.hordeDone && this.hordeSpawned >= this.hordeTotal && this.hordeAlive <= 0) {
+      this.finishHorde();
+    }
+  }
+
+  finishHorde() {
+    this.hordeDone = true;
+    const perfect = this.hordeDefeated >= this.hordeTotal;
+    const bonus = this.hordeDefeated * 2 + (perfect ? 10 : 0);
+    Player.state.scrap += bonus;
+    this.scrapText.setText(String(Player.state.scrap));
+    sound.win();
+    this.bannerFlash(
+      `${perfect ? 'PERFECT HORDE!' : 'HORDE CLEARED!'}  +${bonus} scrap`,
+      perfect ? '#9fe6a0' : '#ffe14d'
+    );
+    this.time.delayedCall(1300, () => this.startBossSequence());
   }
 
   // ---- boss sequence ----------------------------------------------------
