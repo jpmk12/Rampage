@@ -1,12 +1,26 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT } from '../config.js';
 import { LEVELS } from '../data/levels.js';
+import { ASSET_OVERRIDES } from '../data/assets.js';
 
-// BootScene generates all placeholder art as in-code textures so the project
-// has zero binary assets for now. We'll swap these for real sprites later.
+// BootScene generates placeholder art as in-code textures. Any real sprite
+// registered in data/assets.js is loaded first and used instead — the make*
+// generators below skip a key that's already been loaded.
 export default class BootScene extends Phaser.Scene {
   constructor() {
     super('Boot');
+  }
+
+  // Load any real art the player has dropped in (data/assets.js). Missing or
+  // mistyped files just warn and fall back to the generated placeholder.
+  preload() {
+    const keys = Object.keys(ASSET_OVERRIDES);
+    if (!keys.length) return;
+    this.load.setPath('assets/sprites');
+    this.load.on('loaderror', (file) =>
+      console.warn('[Rampage] asset override failed to load, using placeholder:', file.key)
+    );
+    for (const key of keys) this.load.image(key, ASSET_OVERRIDES[key]);
   }
 
   create() {
@@ -72,6 +86,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Vertical gradient sky, drawn one scanline at a time (cheap, runs once).
   makeSky(key, w, h, topColor, bottomColor) {
+    if (this.textures.exists(key)) return;
     const g = this.add.graphics();
     const top = Phaser.Display.Color.IntegerToColor(topColor);
     const bottom = Phaser.Display.Color.IntegerToColor(bottomColor);
@@ -88,6 +103,7 @@ export default class BootScene extends Phaser.Scene {
   // A single smooth hump that meets the baseline at both edges, so it tiles
   // seamlessly when repeated horizontally as a tileSprite.
   makeHill(key, w, h, color, peakRatio) {
+    if (this.textures.exists(key)) return;
     const g = this.add.graphics();
     g.fillStyle(color, 1);
     g.beginPath();
@@ -108,6 +124,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Dirt band with a grassy top edge and evenly spaced road dashes (tiles).
   makeGround(key, w, h, groundColor, edgeColor) {
+    if (this.textures.exists(key)) return;
     const g = this.add.graphics();
     g.fillStyle(groundColor, 1);
     g.fillRect(0, 0, w, h);
@@ -153,6 +170,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Tier 1 — wobbly cardboard box on two wheels with a red flag.
   makeBodyCardboard(key) {
+    if (this.textures.exists(key)) return;
     const g = this.add.graphics();
     this.drawWheels(g, 36, 92, 15, 0x55555f);
     g.fillStyle(0xc18a42, 1);
@@ -170,6 +188,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Tier 2 — sturdier wooden wagon: planks, rope, blue flag, bigger wheels.
   makeBodyWood(key) {
+    if (this.textures.exists(key)) return;
     const g = this.add.graphics();
     this.drawWheels(g, 36, 94, 17, 0x6b4f2a);
     // plank body
@@ -193,6 +212,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Tier 3 — riveted iron buggy: metal plates, rivets, a little cab.
   makeBodyIron(key) {
+    if (this.textures.exists(key)) return;
     const g = this.add.graphics();
     this.drawWheels(g, 38, 96, 18, 0x9aa0ab);
     // hull
@@ -220,6 +240,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Weapon icons mount by their back-center and extend to the right.
   makeWeaponBow(key) {
+    if (this.textures.exists(key)) return;
     const g = this.add.graphics();
     // bow limb (arc bulging right)
     g.lineStyle(4, 0x8a5d29, 1);
@@ -245,6 +266,7 @@ export default class BootScene extends Phaser.Scene {
   }
 
   makeWeaponCrossbow(key) {
+    if (this.textures.exists(key)) return;
     const g = this.add.graphics();
     // stock
     g.fillStyle(0x7a5a30, 1);
@@ -272,6 +294,7 @@ export default class BootScene extends Phaser.Scene {
   }
 
   makeWeaponCatapult(key) {
+    if (this.textures.exists(key)) return;
     const g = this.add.graphics();
     // frame
     g.fillStyle(0x6b4f2a, 1);
@@ -299,6 +322,7 @@ export default class BootScene extends Phaser.Scene {
   // A silly, non-scary "runner" baddie that faces left (toward the car).
   // Recoloured per biome via the palette. Drawn into ~64x66.
   makeRunner(key, pal) {
+    if (this.textures.exists(key)) return;
     const W = 64;
     const H = 66;
     const g = this.add.graphics();
@@ -358,6 +382,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Brute — a big, bulky baddie. Tough, slow, can't be jumped over. ~96x96.
   makeBrute(key, pal) {
+    if (this.textures.exists(key)) return;
     const W = 96;
     const H = 96;
     const g = this.add.graphics();
@@ -408,6 +433,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Lobber — hoists a rock overhead to throw. ~62x74.
   makeLobber(key, pal) {
+    if (this.textures.exists(key)) return;
     const W = 62;
     const H = 74;
     const g = this.add.graphics();
@@ -450,6 +476,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Flyer — a little winged imp. Faces left, flaps. ~74x52.
   makeFlyer(key, pal) {
+    if (this.textures.exists(key)) return;
     const W = 74;
     const H = 52;
     const g = this.add.graphics();
@@ -485,6 +512,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Goblin Drummer mini-boss — a goblin banging a big drum. ~96x104.
   makeDrummer(key) {
+    if (this.textures.exists(key)) return;
     const W = 96;
     const H = 104;
     const g = this.add.graphics();
@@ -542,6 +570,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Big Chief Gloop — a fat goblin chief in a wheelbarrow. ~168x132.
   makeGloop(key) {
+    if (this.textures.exists(key)) return;
     const W = 168;
     const H = 132;
     const g = this.add.graphics();
@@ -611,6 +640,7 @@ export default class BootScene extends Phaser.Scene {
 
   // A leafy cabbage that Gloop throws.
   makeCabbage(key) {
+    if (this.textures.exists(key)) return;
     const S = 32;
     const g = this.add.graphics();
     g.fillStyle(0x4f8a26, 1);
@@ -630,6 +660,7 @@ export default class BootScene extends Phaser.Scene {
   // Bolt-on top turret: a chunky gun on a base, barrel pointing right.
   // Anchored at the bottom-center so it sits on (and stacks on) the hull.
   makeTurret(key) {
+    if (this.textures.exists(key)) return;
     const W = 48;
     const H = 42;
     const g = this.add.graphics();
@@ -654,6 +685,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Sturdy Axle reward icon — an axle with two little wheels.
   makeAxle(key) {
+    if (this.textures.exists(key)) return;
     const W = 56;
     const H = 32;
     const g = this.add.graphics();
@@ -671,6 +703,7 @@ export default class BootScene extends Phaser.Scene {
 
   // A grey rock the lobber throws (also used when it lands/poofs).
   makeEnemyRock(key) {
+    if (this.textures.exists(key)) return;
     const S = 22;
     const g = this.add.graphics();
     g.fillStyle(0x8b8f98, 1);
@@ -685,6 +718,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Ground hazard — a spiky rock/log pile to jump over. Anchored at bottom.
   makeHazard(key, style) {
+    if (this.textures.exists(key)) return;
     const W = 76;
     const H = 56;
     const g = this.add.graphics();
@@ -750,6 +784,7 @@ export default class BootScene extends Phaser.Scene {
 
   // A round, biome-coloured boss projectile.
   makeProjBall(key, color) {
+    if (this.textures.exists(key)) return;
     const S = 30;
     const g = this.add.graphics();
     const dark = Math.max(0, color - 0x222222);
@@ -765,6 +800,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Heart icon for the health HUD (filled or empty outline).
   makeHeart(key, filled) {
+    if (this.textures.exists(key)) return;
     const S = 30;
     const g = this.add.graphics();
     const color = filled ? 0xff5d6c : 0x3a3d4a;
@@ -787,6 +823,7 @@ export default class BootScene extends Phaser.Scene {
 
   // A little gold scrap "nut" pickup.
   makeScrap(key) {
+    if (this.textures.exists(key)) return;
     const S = 26;
     const g = this.add.graphics();
     g.fillStyle(0xc9961f, 1);
@@ -804,6 +841,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Checkered finish flag on a pole, anchored at the bottom of the texture.
   makeFlag(key) {
+    if (this.textures.exists(key)) return;
     const W = 76;
     const H = 190;
     const g = this.add.graphics();
@@ -835,6 +873,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Fluffy cloud made of overlapping soft blobs (tinted per biome at use).
   makeCloud(key) {
+    if (this.textures.exists(key)) return;
     const W = 150;
     const H = 64;
     const g = this.add.graphics();
@@ -851,6 +890,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Tiny soft particle for weather (snow, embers, pollen, etc.; tinted at use).
   makeFlake(key) {
+    if (this.textures.exists(key)) return;
     const S = 10;
     const g = this.add.graphics();
     g.fillStyle(0xffffff, 0.35);
@@ -863,6 +903,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Soft glowing sun/moon disc (tinted per biome at use).
   makeSun(key) {
+    if (this.textures.exists(key)) return;
     const S = 150;
     const c = 75;
     const g = this.add.graphics();
@@ -878,6 +919,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Soft round puff used for the cartoony defeat burst (tinted at use).
   makePuff(key) {
+    if (this.textures.exists(key)) return;
     const S = 24;
     const g = this.add.graphics();
     g.fillStyle(0xffffff, 0.5);
@@ -890,6 +932,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Projectiles ---------------------------------------------------------
   makeShotBow(key) {
+    if (this.textures.exists(key)) return;
     const g = this.add.graphics();
     g.fillStyle(0xffd34d, 1);
     g.fillRoundedRect(0, 2, 16, 6, 3);
@@ -900,6 +943,7 @@ export default class BootScene extends Phaser.Scene {
   }
 
   makeShotCrossbow(key) {
+    if (this.textures.exists(key)) return;
     const g = this.add.graphics();
     g.fillStyle(0xcfd3da, 1);
     g.fillRect(0, 3, 18, 4);
@@ -910,6 +954,7 @@ export default class BootScene extends Phaser.Scene {
   }
 
   makeShotCatapult(key) {
+    if (this.textures.exists(key)) return;
     const g = this.add.graphics();
     g.fillStyle(0x8b8f98, 1);
     g.fillCircle(9, 9, 9);
@@ -921,6 +966,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Bolt — the friendly tinkering robot dog who runs the Garage.
   makeBolt(key) {
+    if (this.textures.exists(key)) return;
     const g = this.add.graphics();
     // body
     g.fillStyle(0xd7a13a, 1);
@@ -957,6 +1003,7 @@ export default class BootScene extends Phaser.Scene {
   }
 
   makeShotCannon(key) {
+    if (this.textures.exists(key)) return;
     const g = this.add.graphics();
     g.fillStyle(0x3a3d44, 1);
     g.fillCircle(10, 10, 9);
@@ -967,6 +1014,7 @@ export default class BootScene extends Phaser.Scene {
   }
 
   makeShotRocket(key) {
+    if (this.textures.exists(key)) return;
     const g = this.add.graphics();
     g.fillStyle(0xe04a3a, 1);
     g.fillRoundedRect(0, 3, 18, 8, 3);
@@ -980,6 +1028,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Tier 4 — Armored Truck: heavy plated pickup with bull bars. 124x92.
   makeBodyArmored(key) {
+    if (this.textures.exists(key)) return;
     const g = this.add.graphics();
     this.drawWheels(g, 38, 96, 18, 0x9aa0ab);
     // hull
@@ -1011,6 +1060,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Tier 5 — Battle Tank: treads, turret, antenna flag. 124x92.
   makeBodyTank(key) {
+    if (this.textures.exists(key)) return;
     const g = this.add.graphics();
     // tread base
     g.fillStyle(0x33383f, 1);
@@ -1039,6 +1089,7 @@ export default class BootScene extends Phaser.Scene {
   }
 
   makeWeaponCannon(key) {
+    if (this.textures.exists(key)) return;
     const g = this.add.graphics();
     g.fillStyle(0x4a4f57, 1);
     g.fillRoundedRect(0, 8, 30, 16, 4);
@@ -1051,6 +1102,7 @@ export default class BootScene extends Phaser.Scene {
   }
 
   makeWeaponRocket(key) {
+    if (this.textures.exists(key)) return;
     const g = this.add.graphics();
     // launch tube
     g.fillStyle(0x4f5a48, 1);
@@ -1068,6 +1120,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Mayor Moldy — a tall top-hat zombie. ~150x132.
   makeBossMoldy(key) {
+    if (this.textures.exists(key)) return;
     const g = this.add.graphics();
     // legs
     g.fillStyle(0x3f4a36, 1);
@@ -1118,6 +1171,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Sheriff Snaketail — a bandit on a big scorpion. ~160x132.
   makeBossSnaketail(key) {
+    if (this.textures.exists(key)) return;
     const g = this.add.graphics();
     // scorpion body
     g.fillStyle(0x9c5a2c, 1);
@@ -1167,6 +1221,7 @@ export default class BootScene extends Phaser.Scene {
 
   // Frost King Yeti — a big armored yeti with an ice crown. ~150x132.
   makeBossYeti(key) {
+    if (this.textures.exists(key)) return;
     const g = this.add.graphics();
     // legs/feet
     g.fillStyle(0xdfeefb, 1);
@@ -1212,6 +1267,7 @@ export default class BootScene extends Phaser.Scene {
 
   // King Krang — the mecha-goblin warlord (final boss). ~160x140.
   makeBossKrang(key) {
+    if (this.textures.exists(key)) return;
     const g = this.add.graphics();
     // legs
     g.fillStyle(0x33383f, 1);

@@ -133,9 +133,14 @@ screen. The car can still be bumped (it flashes and gets briefly stunned) but
 never loses hearts and there's no Game Over — so little kids can just drive,
 shoot, and enjoy the ride. A "👶 KID MODE" badge shows in the HUD when it's on.
 
-See **[docs/ART_UPGRADE.md](./docs/ART_UPGRADE.md)** for the plan to take the
-graphics further (real sprite assets, animation, shaders, etc.). Other possible
-next steps: a cosmetic sticker shop.
+**Real-art drop-in pipeline (done):** any PNG you add to
+`public/assets/sprites/` and register in `src/data/assets.js` automatically
+replaces the matching code-drawn placeholder — no gameplay changes. See
+**[docs/ASSETS.md](./docs/ASSETS.md)** for the full list of art keys, sizes, and
+where to get free/CC0 art that fits.
+
+See **[docs/ART_UPGRADE.md](./docs/ART_UPGRADE.md)** for the broader plan
+(animation, shaders, etc.). Other possible next steps: a cosmetic sticker shop.
 
 ## Tech
 
