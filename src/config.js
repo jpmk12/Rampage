@@ -6,6 +6,11 @@ export const GAME_HEIGHT = 540;
 // Where the ground band starts (top edge of the dirt).
 export const GROUND_TOP_Y = GAME_HEIGHT - 90;
 
+// Apparent speed of the world sliding past the (fixed) car, in px/ms.
+// Kept in sync with the ground tile scroll so things resting on the ground
+// drift at the same rate as the road under them.
+export const WORLD_SCROLL = 0.32;
+
 export const CAR = {
   x: 160, // fixed horizontal position; the world scrolls past it
   minY: 200, // highest the car can fly
@@ -23,6 +28,27 @@ export const SCROLL = {
   ground: 0.32,
 };
 
+export const ENEMY = {
+  goblinHp: 1,
+  goblinSpeed: 440, // px/s, moving left toward the car (faster than the world)
+  spawnEveryMin: 850, // ms
+  spawnEveryMax: 1700, // ms
+  firstSpawnDelay: 1200, // ms grace before the first goblin
+};
+
+export const SCRAP = {
+  value: 1,
+  magnetRange: 240, // start homing toward the car within this distance
+  collectRange: 42, // collected once this close
+  homeLerp: 0.018, // how strongly scrap eases toward the car per ms
+};
+
+export const LEVEL = {
+  // distance (px of world scroll) the player covers before the finish flag
+  // rolls in. ~11000 / 0.32 ≈ 34s of action.
+  length: 11000,
+};
+
 export const COLORS = {
   skyTop: 0x6fc4e8,
   skyBottom: 0xcdeefb,
@@ -35,4 +61,10 @@ export const COLORS = {
   wheel: 0x2b2b33,
   bullet: 0xffd34d,
   bulletEdge: 0xe88f1a,
+  goblin: 0x74b13c,
+  goblinDark: 0x4f8a26,
+  goblinBelly: 0x9fd06a,
+  scrap: 0xf4c542,
+  scrapDark: 0xc9961f,
+  puff: 0xffffff,
 };

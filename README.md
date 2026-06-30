@@ -33,11 +33,17 @@ npm run preview  # serve the production build locally
 ## Status
 
 **Milestone 0 — Skeleton (done):** auto-scrolling parallax world, a cardboard
-car you steer up/down, and a working fire button. All art is generated in code,
-so there are no binary assets yet.
+car you steer up/down, and a working fire button.
 
-Next up — **Milestone 1:** goblin enemies, shooting destroys them, Scrap drops
-and auto-collects, and a finish flag. See the roadmap in `GAME_DESIGN.md`.
+**Milestone 1 — Core loop (done):** goblins run in from the right, your shots
+destroy them with a cartoony poof, defeated goblins drop Scrap that auto-homes
+into a counter, a progress bar tracks your run, and a checkered finish flag
+rolls in to end the level with a confetti "Level Complete!" screen (R or tap to
+replay). All art is still generated in code — no binary assets yet.
+
+Next up — **Milestone 2:** the end-of-level Garage upgrade screen — spend Scrap
+to buy a new car body or weapon and see the car change, saved to `localStorage`.
+See the roadmap in `GAME_DESIGN.md`.
 
 ## Tech
 

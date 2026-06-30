@@ -24,5 +24,7 @@ const config = {
   scene: [BootScene, GameScene],
 };
 
-// eslint-disable-next-line no-new
-new Phaser.Game(config);
+const game = new Phaser.Game(config);
+
+// Expose for quick debugging / automated smoke tests in the browser console.
+window.__PHASER_GAME__ = game;
