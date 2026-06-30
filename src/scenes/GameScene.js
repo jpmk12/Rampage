@@ -5,6 +5,9 @@ import {
   GROUND_TOP_Y,
   WORLD_SCROLL,
   CAR,
+  JUMP_CLEAR,
+  COMBAT,
+  HAZARD,
   SCROLL,
   ENEMY,
   SCRAP,
@@ -12,13 +15,16 @@ import {
   COLORS,
 } from '../config.js';
 import { Player } from '../state/PlayerState.js';
-import { getWeapon } from '../data/catalog.js';
-import { buildCar } from '../entities/Car.js';
+import { getBody, getWeapon } from '../data/catalog.js';
+import { pickEnemyType } from '../data/enemies.js';
+import { buildCar, muzzleFor } from '../entities/Car.js';
 
-// The action level: goblins, shooting, scrap, and the finish flag. On
-// completion it hands off to the Garage (Milestone 2) carrying the run's
-// earnings. The car is built from the player's equipped loadout, so upgrades
-// bought in the Garage show up here both visually and in the weapon stats.
+// Aim limits: mostly upward (negative = up on screen) so you can hit flyers.
+const AIM = { min: -1.15, max: 0.45, rate: 0.0026, topZ: 70, botZ: GROUND_TOP_Y };
+
+// The action level. The car drives on the ground and JUMPS; up/down AIM the
+// weapon. Goblins come in four flavours, lobbers throw arcing rocks, ground
+// hazards must be jumped, and hearts track damage.
 export default class GameScene extends Phaser.Scene {
   constructor() {
     super('Game');
@@ -28,6 +34,8 @@ export default class GameScene extends Phaser.Scene {
     const profile = Player.state;
     this.level = profile.level;
     this.weapon = getWeapon(profile.weapon);
+    this.maxHealth = getBody(profile.body).health;
+    this.health = this.maxHealth;
     this.levelStartScrap = profile.scrap;
 
     this.state = 'playing';
@@ -35,8 +43,16 @@ export default class GameScene extends Phaser.Scene {
     this.flagSpawned = false;
     this.flag = null;
 
-    // a touch more pressure each level so upgrades pay off
-    this.spawnGap = Math.max(450, ENEMY.spawnEveryMin - (this.level - 1) * 80);
+    // car physics + aim
+    this.carVY = 0;
+    this.onGround = true;
+    this.aim = -0.15;
+    this.aiming = false;
+    this.aimPointerId = null;
+    this.aimTargetY = GROUND_TOP_Y - 120;
+    this.invulnUntil = 0;
+
+    this.spawnGap = Math.max(420, ENEMY.spawnEveryMin - (this.level - 1) * 70);
 
     this.buildBackground();
     this.buildCar(profile);
@@ -44,8 +60,10 @@ export default class GameScene extends Phaser.Scene {
     this.buildInput();
     this.buildHud();
     this.nextSpawnAt = this.time.now + ENEMY.firstSpawnDelay;
+    this.nextHazardAt = this.time.now + Phaser.Math.Between(HAZARD.everyMin, HAZARD.everyMax);
 
     this.physics.add.overlap(this.bullets, this.goblins, this.onBulletHit, null, this);
+    this.physics.add.overlap(this.bullets, this.enemyShots, this.onShootRock, null, this);
   }
 
   buildBackground() {
@@ -62,36 +80,45 @@ export default class GameScene extends Phaser.Scene {
   }
 
   buildCar(profile) {
-    this.car = buildCar(this, CAR.x, CAR.startY, profile.body, profile.weapon);
+    this.car = buildCar(this, CAR.x, CAR.groundY, profile.body, profile.weapon);
     this.car.setDepth(5);
-    this.carTargetY = CAR.startY;
-    this.usePointerSteering = false;
+    this.weaponSprite = this.car.getData('weaponSprite');
   }
 
   buildGroups() {
     this.bullets = this.physics.add.group();
     this.goblins = this.physics.add.group();
+    this.enemyShots = this.physics.add.group();
     this.scraps = this.add.group();
+    this.hazards = this.add.group();
     this.lastFireAt = 0;
   }
 
   buildInput() {
     this.cursors = this.input.keyboard.createCursorKeys();
-    this.keys = this.input.keyboard.addKeys('W,S');
-    this.fireKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.keys = this.input.keyboard.addKeys('W,S,R');
+    this.jumpKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.input.addPointer(2); // allow two thumbs on a tablet
 
-    this.pointerHeld = false;
     this.input.on('pointerdown', (p) => {
+      if (this.state === 'over') {
+        this.scene.restart();
+        return;
+      }
       if (this.state !== 'playing') return;
-      this.pointerHeld = true;
-      this.usePointerSteering = true;
-      this.carTargetY = p.y;
+      if (p.x < GAME_WIDTH * 0.5) {
+        this.tryJump(); // left side = jump
+      } else {
+        this.aiming = true; // right side = aim
+        this.aimPointerId = p.id;
+        this.aimTargetY = p.y;
+      }
     });
     this.input.on('pointermove', (p) => {
-      if (p.isDown) this.carTargetY = p.y;
+      if (this.aiming && p.id === this.aimPointerId && p.isDown) this.aimTargetY = p.y;
     });
-    this.input.on('pointerup', () => {
-      this.pointerHeld = false;
+    this.input.on('pointerup', (p) => {
+      if (p.id === this.aimPointerId) this.aiming = false;
     });
   }
 
@@ -105,26 +132,38 @@ export default class GameScene extends Phaser.Scene {
     };
     this.add.text(16, 12, `RAMPAGE — Level ${this.level}`, { ...style, fontSize: '24px' }).setDepth(20);
     this.add
-      .text(16, 44, `Weapon: ${this.weapon.name}    Fire: Space / tap`, {
+      .text(16, 44, 'Aim: ↑/↓ or drag right   Jump: Space or tap left', {
         ...style,
         fontSize: '15px',
         color: '#ffe9b0',
       })
       .setDepth(20);
 
+    // hearts
+    this.hearts = [];
+    for (let i = 0; i < this.maxHealth; i++) {
+      this.hearts.push(this.add.image(28 + i * 30, 84, 'heart').setDepth(20));
+    }
+
     this.add.image(GAME_WIDTH - 120, 26, 'scrap').setScale(1.1).setDepth(20);
     this.scrapText = this.add
       .text(GAME_WIDTH - 104, 14, String(Player.state.scrap), { ...style, fontSize: '26px' })
       .setDepth(20);
 
-    this.progressBg = this.add
-      .rectangle(GAME_WIDTH / 2, 24, 260, 12, 0x1b1d2a, 0.55)
-      .setDepth(20);
+    this.add.rectangle(GAME_WIDTH / 2, 24, 260, 12, 0x1b1d2a, 0.55).setDepth(20);
     this.progressFill = this.add
       .rectangle(GAME_WIDTH / 2 - 128, 24, 4, 8, 0x6fd06a, 1)
       .setOrigin(0, 0.5)
       .setDepth(20);
     this.add.image(GAME_WIDTH / 2 + 132, 24, 'flag').setScale(0.18).setDepth(20);
+
+    // subtle touch hints
+    const hint = { fontFamily: 'system-ui, sans-serif', fontSize: '13px', color: '#ffffff' };
+    this.add.text(20, GAME_HEIGHT - 26, '⤒ tap = jump', hint).setAlpha(0.35).setDepth(20);
+    this.add
+      .text(GAME_WIDTH - 130, GAME_HEIGHT - 26, 'drag = aim ⇅', hint)
+      .setAlpha(0.35)
+      .setDepth(20);
   }
 
   update(time, delta) {
@@ -132,11 +171,15 @@ export default class GameScene extends Phaser.Scene {
       this.scrollWorld(delta);
       this.advanceLevel(delta);
       this.maybeSpawnGoblin(time);
+      this.maybeSpawnHazard(time);
       this.handleFiring(time);
     }
-    this.steerCar(delta);
-    this.updateGoblins();
+    this.updateCarPhysics(delta);
+    this.updateAim(delta);
+    this.updateGoblins(time);
+    this.updateEnemyShots();
     this.updateScraps(delta);
+    this.updateHazards(delta);
     this.updateFlag(delta);
     this.cullBullets();
   }
@@ -154,51 +197,155 @@ export default class GameScene extends Phaser.Scene {
     if (!this.flagSpawned && this.distance >= LEVEL.length) this.spawnFlag();
   }
 
-  steerCar(delta) {
-    const up = this.cursors.up.isDown || this.keys.W.isDown;
-    const down = this.cursors.down.isDown || this.keys.S.isDown;
+  // ---- car: jump + aim --------------------------------------------------
 
-    if (up || down) {
-      this.usePointerSteering = false;
-      if (up) this.car.y -= CAR.vSpeed * delta;
-      if (down) this.car.y += CAR.vSpeed * delta;
-    } else if (this.usePointerSteering) {
-      const diff = this.carTargetY - this.car.y;
-      this.car.y += diff * Math.min(1, 0.015 * delta);
+  tryJump() {
+    if (this.state !== 'playing' || !this.onGround) return;
+    this.carVY = -CAR.jumpVel;
+    this.onGround = false;
+  }
+
+  updateCarPhysics(delta) {
+    // jump is edge-triggered (a tap), not held
+    if (
+      this.state === 'playing' &&
+      (Phaser.Input.Keyboard.JustDown(this.jumpKey) ||
+        Phaser.Input.Keyboard.JustDown(this.keys.W))
+    ) {
+      this.tryJump();
     }
 
-    this.car.y = Phaser.Math.Clamp(this.car.y, CAR.minY, CAR.maxY);
-    this.car.rotation = Math.sin(this.time.now * 0.006) * 0.015;
+    if (!this.onGround) {
+      this.carVY += CAR.gravity * delta;
+      this.car.y += this.carVY * delta;
+      if (this.car.y >= CAR.groundY) {
+        this.car.y = CAR.groundY;
+        this.carVY = 0;
+        this.onGround = true;
+      }
+    }
+    // tilt slightly while airborne for juice
+    this.car.rotation = Phaser.Math.Clamp(this.carVY * 0.06, -0.14, 0.14);
+  }
+
+  updateAim(delta) {
+    const up = this.cursors.up.isDown;
+    const down = this.cursors.down.isDown;
+    if (up || down) {
+      this.aim += (down ? 1 : -1) * AIM.rate * delta;
+    } else if (this.aiming) {
+      const t = Phaser.Math.Clamp((this.aimTargetY - AIM.topZ) / (AIM.botZ - AIM.topZ), 0, 1);
+      const target = Phaser.Math.Linear(AIM.min, AIM.max, t);
+      this.aim = Phaser.Math.Linear(this.aim, target, Math.min(1, 0.02 * delta));
+    }
+    this.aim = Phaser.Math.Clamp(this.aim, AIM.min, AIM.max);
+    if (this.weaponSprite) this.weaponSprite.rotation = this.aim;
+  }
+
+  carCenterY() {
+    return this.car.y - 30;
   }
 
   // ---- enemies ----------------------------------------------------------
 
   maybeSpawnGoblin(time) {
-    if (this.distance >= LEVEL.length) return; // flag is inbound
+    if (this.distance >= LEVEL.length) return;
     if (time < this.nextSpawnAt) return;
 
-    const goblin = this.goblins.create(GAME_WIDTH + 50, GROUND_TOP_Y + 2, 'goblin');
-    goblin.setOrigin(0.5, 1);
-    goblin.body.setAllowGravity(false);
-    goblin.setVelocityX(-ENEMY.goblinSpeed);
-    goblin.setData('hp', ENEMY.goblinHp);
-    goblin.setData('bobSeed', Math.random() * Math.PI * 2);
+    const type = pickEnemyType(Math.random);
+    const x = GAME_WIDTH + 50;
+    const y = type.lane === 'air' ? CAR.groundY - 120 : GROUND_TOP_Y + 2;
 
-    const gap = Phaser.Math.Between(this.spawnGap, this.spawnGap + 850);
+    const e = this.goblins.create(x, y, type.texture);
+    e.setOrigin(0.5, 1);
+    e.body.setAllowGravity(false);
+    e.setVelocityX(-type.speed);
+    e.setData('type', type);
+    e.setData('hp', type.hp);
+    e.setData('seed', Math.random() * Math.PI * 2);
+    if (type.lane === 'air') {
+      e.setOrigin(0.5, 0.5);
+      e.setData('baseY', y);
+    }
+    if (type.lobs) e.setData('nextLob', time + Phaser.Math.Between(600, 1200));
+
+    const gap = Phaser.Math.Between(this.spawnGap, this.spawnGap + 800);
     this.nextSpawnAt = time + gap;
   }
 
-  updateGoblins() {
-    this.goblins.children.iterate((g) => {
-      if (!g) return true;
-      const t = this.time.now * 0.018 + g.getData('bobSeed');
-      g.rotation = Math.sin(t) * 0.08;
-      if (g.x < -60) {
-        g.destroy();
-        if (this.state === 'playing') this.cameras.main.shake(120, 0.004);
+  updateGoblins(time) {
+    const carCY = this.carCenterY();
+    this.goblins.children.iterate((e) => {
+      if (!e) return true;
+      const type = e.getData('type');
+      const t = this.time.now * 0.012 + e.getData('seed');
+
+      if (type.lane === 'air') {
+        e.y = e.getData('baseY') + Math.sin(t * 1.6) * 26;
+      } else {
+        e.rotation = Math.sin(t * 1.5) * 0.08;
+        if (type.lobs && this.state === 'playing' && e.x < GAME_WIDTH - 70 && time > e.getData('nextLob')) {
+          this.lobRock(e);
+          e.setData('nextLob', time + Phaser.Math.Between(1400, 2400));
+        }
       }
+
+      // reached the car?
+      if (this.state === 'playing' && Math.abs(e.x - this.car.x) < 40) {
+        const hitsAir = type.lane === 'air' && Math.abs(e.y - carCY) < 48;
+        const airborne = CAR.groundY - this.car.y;
+        const hitsGround = type.lane !== 'air' && airborne < type.clearH;
+        if (hitsAir || hitsGround) {
+          this.poof(e.x, type.lane === 'air' ? e.y : e.y - 24, COLORS.goblin);
+          e.destroy();
+          this.damageCar(COMBAT.contactDamage);
+          return true;
+        }
+      }
+
+      if (e.x < -90) e.destroy();
       return true;
     });
+  }
+
+  lobRock(lobber) {
+    const r = this.enemyShots.create(lobber.x - 8, lobber.y - 52, 'enemy-rock');
+    r.body.setAllowGravity(true);
+    r.body.setGravityY(900);
+    r.setVelocity(-190, -360);
+    r.setData('spin', Phaser.Math.FloatBetween(-0.01, 0.01));
+  }
+
+  updateEnemyShots() {
+    const carCY = this.carCenterY();
+    this.enemyShots.children.iterate((r) => {
+      if (!r) return true;
+      r.rotation += r.getData('spin') || 0.006;
+
+      if (
+        this.state === 'playing' &&
+        Math.abs(r.x - this.car.x) < 30 &&
+        Math.abs(r.y - carCY) < 34
+      ) {
+        this.poof(r.x, r.y, 0x9aa0ab);
+        r.destroy();
+        this.damageCar(COMBAT.rockDamage);
+        return true;
+      }
+      if (r.y > GROUND_TOP_Y - 2) {
+        this.poof(r.x, GROUND_TOP_Y - 6, 0x9aa0ab);
+        r.destroy();
+        return true;
+      }
+      if (r.x < -40 || r.x > GAME_WIDTH + 80) r.destroy();
+      return true;
+    });
+  }
+
+  onShootRock(bullet, rock) {
+    bullet.destroy();
+    this.poof(rock.x, rock.y, 0xcfd3da);
+    rock.destroy();
   }
 
   onBulletHit(bullet, goblin) {
@@ -214,8 +361,12 @@ export default class GameScene extends Phaser.Scene {
   }
 
   defeatGoblin(goblin) {
-    this.poof(goblin.x, goblin.y - 28, COLORS.goblin);
-    this.spawnScrap(goblin.x, goblin.y - 28);
+    const type = goblin.getData('type');
+    const yy = type.lane === 'air' ? goblin.y : goblin.y - 26;
+    this.poof(goblin.x, yy, COLORS.goblin);
+    for (let i = 0; i < (type.scrap || 1); i++) {
+      this.spawnScrap(goblin.x + Phaser.Math.Between(-12, 12), yy + Phaser.Math.Between(-8, 8));
+    }
     goblin.destroy();
   }
 
@@ -237,6 +388,34 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
+  // ---- damage / health --------------------------------------------------
+
+  damageCar(amount) {
+    if (this.state !== 'playing') return;
+    if (this.time.now < this.invulnUntil) return;
+
+    this.health -= amount;
+    this.invulnUntil = this.time.now + COMBAT.invuln;
+    this.cameras.main.shake(180, 0.006);
+    this.renderHearts();
+
+    // blink the car while invulnerable
+    this.tweens.add({
+      targets: this.car,
+      alpha: { from: 0.25, to: 1 },
+      duration: 150,
+      yoyo: true,
+      repeat: Math.floor(COMBAT.invuln / 300),
+      onComplete: () => this.car && this.car.setAlpha(1),
+    });
+
+    if (this.health <= 0) this.gameOver();
+  }
+
+  renderHearts() {
+    this.hearts.forEach((h, i) => h.setTexture(i < this.health ? 'heart' : 'heart-empty'));
+  }
+
   // ---- scrap ------------------------------------------------------------
 
   spawnScrap(x, y) {
@@ -247,11 +426,10 @@ export default class GameScene extends Phaser.Scene {
 
   updateScraps(delta) {
     const cx = this.car.x;
-    const cy = this.car.y - 30;
+    const cy = this.carCenterY();
     this.scraps.children.iterate((s) => {
       if (!s) return true;
       const dist = Phaser.Math.Distance.Between(s.x, s.y, cx, cy);
-
       if (dist < SCRAP.collectRange) {
         this.collectScrap(s);
         return true;
@@ -280,8 +458,6 @@ export default class GameScene extends Phaser.Scene {
 
   collectScrap(s) {
     s.destroy();
-    // mutate in-memory total now; persist once at level end (avoids spamming
-    // localStorage on every pickup)
     Player.state.scrap += SCRAP.value;
     this.scrapText.setText(String(Player.state.scrap));
     this.tweens.add({
@@ -289,6 +465,38 @@ export default class GameScene extends Phaser.Scene {
       scale: { from: 1.35, to: 1 },
       duration: 160,
       ease: 'Back.easeOut',
+    });
+  }
+
+  // ---- hazards ----------------------------------------------------------
+
+  maybeSpawnHazard(time) {
+    if (this.distance >= LEVEL.length) return;
+    if (time < this.nextHazardAt) return;
+    const h = this.hazards.create(GAME_WIDTH + 60, GROUND_TOP_Y + 6, 'hazard');
+    h.setOrigin(0.5, 1).setDepth(4);
+    h.setData('hit', false);
+    this.nextHazardAt = time + Phaser.Math.Between(HAZARD.everyMin, HAZARD.everyMax);
+  }
+
+  updateHazards(delta) {
+    this.hazards.children.iterate((h) => {
+      if (!h) return true;
+      h.x -= WORLD_SCROLL * delta;
+      if (
+        this.state === 'playing' &&
+        !h.getData('hit') &&
+        Math.abs(h.x - this.car.x) < 38
+      ) {
+        const airborne = CAR.groundY - this.car.y;
+        if (airborne < HAZARD.clearH) {
+          h.setData('hit', true);
+          this.poof(h.x, GROUND_TOP_Y - 10, 0xcfd3da);
+          this.damageCar(COMBAT.hazardDamage);
+        }
+      }
+      if (h.x < -60) h.destroy();
+      return true;
     });
   }
 
@@ -308,7 +516,7 @@ export default class GameScene extends Phaser.Scene {
 
   completeLevel() {
     this.state = 'complete';
-    this.pointerHeld = false;
+    this.aiming = false;
     this.goblins.children.iterate((g) => {
       if (g) g.setVelocityX(0);
       return true;
@@ -317,33 +525,43 @@ export default class GameScene extends Phaser.Scene {
     const cx = GAME_WIDTH / 2;
     const cy = GAME_HEIGHT / 2;
     this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x1b1d2a, 0.4).setDepth(30);
-    this.add
-      .text(cx, cy - 20, 'LEVEL COMPLETE!', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '48px',
-        color: '#ffe14d',
-        stroke: '#1b1d2a',
-        strokeThickness: 6,
-      })
-      .setOrigin(0.5)
-      .setDepth(32);
-    this.add
-      .text(cx, cy + 34, 'Rolling into the Garage…', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '22px',
-        color: '#ffffff',
-        stroke: '#1b1d2a',
-        strokeThickness: 4,
-      })
-      .setOrigin(0.5)
-      .setDepth(32);
-    for (let i = 0; i < 24; i++) {
-      this.time.delayedCall(i * 26, () => this.confettiBit(cx, cy - 140));
-    }
+    this.bannerText(cx, cy - 20, 'LEVEL COMPLETE!', '#ffe14d', 48);
+    this.bannerText(cx, cy + 34, 'Rolling into the Garage…', '#ffffff', 22);
+    for (let i = 0; i < 24; i++) this.time.delayedCall(i * 26, () => this.confettiBit(cx, cy - 140));
 
     const earned = Player.state.scrap - this.levelStartScrap;
     Player.save();
     this.time.delayedCall(1700, () => this.scene.start('Garage', { earned }));
+  }
+
+  gameOver() {
+    this.state = 'over';
+    this.aiming = false;
+    Player.save();
+    this.goblins.children.iterate((g) => {
+      if (g) g.setVelocityX(0);
+      return true;
+    });
+
+    const cx = GAME_WIDTH / 2;
+    const cy = GAME_HEIGHT / 2;
+    this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x1b1d2a, 0.55).setDepth(30);
+    this.bannerText(cx, cy - 30, 'GAME OVER', '#ff7a7a', 50);
+    this.bannerText(cx, cy + 26, 'Tap or press R to try again', '#ffffff', 22);
+    this.bannerText(cx, cy + 60, `Scrap kept: ${Player.state.scrap}`, '#ffe14d', 18);
+  }
+
+  bannerText(x, y, msg, color, size) {
+    return this.add
+      .text(x, y, msg, {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: `${size}px`,
+        color,
+        stroke: '#1b1d2a',
+        strokeThickness: 5,
+      })
+      .setOrigin(0.5)
+      .setDepth(32);
   }
 
   confettiBit(x, y) {
@@ -364,22 +582,21 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  // ---- shooting & misc --------------------------------------------------
+  // ---- shooting ---------------------------------------------------------
 
   handleFiring(time) {
-    const wantsToFire = this.fireKey.isDown || this.pointerHeld;
-    if (!wantsToFire) return;
     if (time - this.lastFireAt < this.weapon.cooldown) return;
-
     this.lastFireAt = time;
-    const muzzle = this.car.getData('muzzle');
-    const mx = this.car.x + muzzle.x;
-    const my = this.car.y + muzzle.y;
+
+    const m = muzzleFor(this.car, this.aim);
+    const mx = this.car.x + m.x;
+    const my = this.car.y + m.y;
 
     const shot = this.bullets.create(mx, my, this.weapon.shot);
     shot.setScale(this.weapon.shotScale || 1);
+    shot.setRotation(this.aim);
     shot.body.setAllowGravity(false);
-    shot.setVelocityX(this.weapon.speed);
+    shot.setVelocity(Math.cos(this.aim) * this.weapon.speed, Math.sin(this.aim) * this.weapon.speed);
 
     this.tweens.add({
       targets: this.car,
@@ -391,7 +608,8 @@ export default class GameScene extends Phaser.Scene {
 
   cullBullets() {
     this.bullets.children.iterate((b) => {
-      if (b && b.x > GAME_WIDTH + 40) b.destroy();
+      if (!b) return true;
+      if (b.x > GAME_WIDTH + 40 || b.x < -40 || b.y < -40 || b.y > GAME_HEIGHT + 40) b.destroy();
       return true;
     });
   }

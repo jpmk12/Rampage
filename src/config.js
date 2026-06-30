@@ -13,12 +13,27 @@ export const WORLD_SCROLL = 0.32;
 
 export const CAR = {
   x: 160, // fixed horizontal position; the world scrolls past it
-  minY: 200, // highest the car can fly
-  maxY: GROUND_TOP_Y + 5, // wheels rest just on the ground
+  groundY: GROUND_TOP_Y - 10, // resting y (wheels on the ground)
   startY: GROUND_TOP_Y - 10,
-  vSpeed: 0.5, // vertical move speed in px per millisecond
-  fireCooldown: 220, // ms between shots
-  bulletSpeed: 640, // px per second
+  jumpVel: 1.05, // upward launch speed, px/ms
+  gravity: 0.0045, // px/ms^2 pulling the car back down
+};
+
+// Jumping high enough clears short ground threats. Tall things (brutes) and
+// air threats can't be jumped over — you have to shoot them.
+export const JUMP_CLEAR = 56; // px off the ground that counts as "airborne"
+
+export const COMBAT = {
+  invuln: 1200, // ms of blinking invulnerability after taking a hit
+  contactDamage: 1,
+  rockDamage: 1,
+  hazardDamage: 1,
+};
+
+export const HAZARD = {
+  everyMin: 3200, // ms between ground hazards
+  everyMax: 5600,
+  clearH: 50, // car must be this high off the ground to clear it
 };
 
 // Parallax scroll speeds (px per millisecond) for each background layer.

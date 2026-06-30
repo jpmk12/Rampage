@@ -31,10 +31,17 @@ export default class BootScene extends Phaser.Scene {
 
     // enemies & fx
     this.makeGoblin('goblin');
+    this.makeBrute('brute');
+    this.makeLobber('lobber');
+    this.makeFlyer('flyer');
+    this.makeEnemyRock('enemy-rock');
+    this.makeHazard('hazard');
     this.makeScrap('scrap');
     this.makeFlag('flag');
     this.makePuff('puff');
     this.makeBolt('bolt');
+    this.makeHeart('heart', true);
+    this.makeHeart('heart-empty', false);
 
     this.scene.start('Game');
   }
@@ -322,6 +329,191 @@ export default class BootScene extends Phaser.Scene {
     g.fillTriangle(31, 27, 35, 27, 33, 31);
 
     g.generateTexture(key, W, H);
+    g.destroy();
+  }
+
+  // Brute — a big, bulky goblin. Tough, slow, can't be jumped over. ~96x96.
+  makeBrute(key) {
+    const W = 96;
+    const H = 96;
+    const g = this.add.graphics();
+    // big club
+    g.fillStyle(0x6b4f2a, 1);
+    g.fillRoundedRect(2, 40, 12, 30, 4);
+    g.fillStyle(0x5e4523, 1);
+    g.fillCircle(8, 40, 11);
+    // ears
+    g.fillStyle(0x5f9a2f, 1);
+    g.fillTriangle(24, 24, 24, 50, 4, 34);
+    g.fillTriangle(72, 24, 72, 50, 92, 34);
+    // body
+    g.fillStyle(0x5f9a2f, 1);
+    g.fillRoundedRect(22, 34, 54, 50, 14);
+    // belly
+    g.fillStyle(0x86c04e, 1);
+    g.fillRoundedRect(34, 50, 30, 28, 12);
+    // legs
+    g.fillStyle(0x4a7d22, 1);
+    g.fillRoundedRect(28, 80, 14, 12, 4);
+    g.fillRoundedRect(54, 80, 14, 12, 4);
+    // head
+    g.fillStyle(0x5f9a2f, 1);
+    g.fillRoundedRect(28, 8, 42, 32, 12);
+    // eyes
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(42, 22, 8);
+    g.fillCircle(58, 22, 8);
+    g.fillStyle(0x222222, 1);
+    g.fillCircle(40, 24, 3.6);
+    g.fillCircle(56, 24, 3.6);
+    // angry brows
+    g.lineStyle(4, 0x3c641a, 1);
+    g.beginPath();
+    g.moveTo(34, 12);
+    g.lineTo(48, 18);
+    g.moveTo(64, 12);
+    g.lineTo(50, 18);
+    g.strokePath();
+    // tusks
+    g.fillStyle(0xffffff, 1);
+    g.fillTriangle(44, 34, 48, 34, 45, 40);
+    g.fillTriangle(54, 34, 58, 34, 55, 40);
+    g.generateTexture(key, W, H);
+    g.destroy();
+  }
+
+  // Lobber — a goblin hoisting a rock overhead to throw. ~62x74.
+  makeLobber(key) {
+    const W = 62;
+    const H = 74;
+    const g = this.add.graphics();
+    // rock held up
+    g.fillStyle(0x8b8f98, 1);
+    g.fillCircle(38, 12, 12);
+    g.fillStyle(0x6b6f78, 1);
+    g.fillCircle(34, 9, 5);
+    // arm up to the rock
+    g.lineStyle(5, 0x7aa83c, 1);
+    g.beginPath();
+    g.moveTo(30, 40);
+    g.lineTo(38, 16);
+    g.strokePath();
+    // ears
+    g.fillStyle(0x7aa83c, 1);
+    g.fillTriangle(16, 26, 16, 42, 4, 32);
+    // body
+    g.fillStyle(0x7aa83c, 1);
+    g.fillRoundedRect(14, 34, 30, 30, 9);
+    g.fillStyle(0xa6d36a, 1);
+    g.fillRoundedRect(20, 44, 16, 16, 7);
+    // legs
+    g.fillStyle(0x5f8a2c, 1);
+    g.fillRoundedRect(18, 60, 8, 10, 3);
+    g.fillRoundedRect(30, 60, 8, 10, 3);
+    // head
+    g.fillStyle(0x7aa83c, 1);
+    g.fillRoundedRect(14, 14, 26, 22, 9);
+    // eyes
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(22, 24, 6);
+    g.fillCircle(33, 24, 6);
+    g.fillStyle(0x222222, 1);
+    g.fillCircle(20, 25, 2.8);
+    g.fillCircle(31, 25, 2.8);
+    g.generateTexture(key, W, H);
+    g.destroy();
+  }
+
+  // Flyer — a little winged imp. Faces left, flaps. ~74x52.
+  makeFlyer(key) {
+    const W = 74;
+    const H = 52;
+    const g = this.add.graphics();
+    // wings
+    g.fillStyle(0x8a5bb0, 1);
+    g.fillTriangle(40, 24, 72, 6, 70, 30);
+    g.fillTriangle(40, 24, 64, 26, 70, 44);
+    // body
+    g.fillStyle(0xa06fc8, 1);
+    g.fillRoundedRect(18, 14, 30, 26, 10);
+    // tail
+    g.fillStyle(0x8a5bb0, 1);
+    g.fillTriangle(46, 22, 46, 32, 60, 27);
+    // head
+    g.fillStyle(0xa06fc8, 1);
+    g.fillRoundedRect(8, 12, 22, 20, 8);
+    // ears
+    g.fillTriangle(12, 12, 18, 12, 13, 2);
+    g.fillTriangle(22, 12, 28, 12, 27, 2);
+    // eyes
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(15, 22, 5);
+    g.fillCircle(24, 22, 5);
+    g.fillStyle(0x222222, 1);
+    g.fillCircle(13, 23, 2.4);
+    g.fillCircle(22, 23, 2.4);
+    // little fangs
+    g.fillStyle(0xffffff, 1);
+    g.fillTriangle(14, 28, 17, 28, 15.5, 32);
+    g.generateTexture(key, W, H);
+    g.destroy();
+  }
+
+  // A grey rock the lobber throws (also used when it lands/poofs).
+  makeEnemyRock(key) {
+    const S = 22;
+    const g = this.add.graphics();
+    g.fillStyle(0x8b8f98, 1);
+    g.fillCircle(11, 11, 10);
+    g.fillStyle(0x6b6f78, 1);
+    g.fillCircle(8, 8, 4);
+    g.fillStyle(0x5a5e66, 1);
+    g.fillCircle(14, 14, 2.5);
+    g.generateTexture(key, S, S);
+    g.destroy();
+  }
+
+  // Ground hazard — a spiky rock/log pile to jump over. Anchored at bottom.
+  makeHazard(key) {
+    const W = 76;
+    const H = 52;
+    const g = this.add.graphics();
+    // log
+    g.fillStyle(0x7a5a30, 1);
+    g.fillRoundedRect(6, 26, 64, 24, 8);
+    g.fillStyle(0x5e4523, 1);
+    g.fillCircle(12, 38, 9);
+    g.fillStyle(0x8a6a3a, 1);
+    g.fillCircle(12, 38, 4);
+    // spikes
+    g.fillStyle(0xcfd3da, 1);
+    for (let i = 0; i < 4; i++) {
+      const x = 18 + i * 14;
+      g.fillTriangle(x, 28, x + 12, 28, x + 6, 8);
+    }
+    g.generateTexture(key, W, H);
+    g.destroy();
+  }
+
+  // Heart icon for the health HUD (filled or empty outline).
+  makeHeart(key, filled) {
+    const S = 30;
+    const g = this.add.graphics();
+    const color = filled ? 0xff5d6c : 0x3a3d4a;
+    g.fillStyle(color, 1);
+    g.fillCircle(10, 11, 6);
+    g.fillCircle(20, 11, 6);
+    g.fillTriangle(4, 13, 26, 13, 15, 27);
+    if (!filled) {
+      g.fillStyle(0x20232f, 1);
+      g.fillCircle(10, 11, 3);
+      g.fillCircle(20, 11, 3);
+      g.fillTriangle(8, 14, 22, 14, 15, 23);
+    } else {
+      g.fillStyle(0xff8a96, 1);
+      g.fillCircle(8, 9, 2);
+    }
+    g.generateTexture(key, S, S);
     g.destroy();
   }
 

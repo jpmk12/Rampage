@@ -41,10 +41,15 @@ Re-running happens automatically on every push.
 
 ## Controls
 
+The car drives itself and **auto-fires**. You aim and jump.
+
 | Action | Keyboard | Touch |
 |--------|----------|-------|
-| Move up / down | ↑ / ↓ or W / S | Drag finger |
-| Fire | Space (hold to autofire) | Tap / hold |
+| Aim up / down | ↑ / ↓ | Drag on the right half |
+| Jump | Space or W | Tap the left half |
+
+Aim up to shoot flyers, jump over ground hazards and to leap short goblins,
+and shoot lobbers' rocks out of the air (or just jump them).
 
 ## Status
 
@@ -65,9 +70,15 @@ everything saves to `localStorage`, so progress survives a refresh. Hit
 **ROLL OUT!** to start the next level with your upgraded ride. Art is still all
 generated in code — no binary assets yet.
 
-Next up — **Milestone 3:** enemy variety (lobbers, brutes, flyers), jumping,
-and a terrain hazard, building toward the full Level 1 boss fight.
-See the roadmap in `GAME_DESIGN.md`.
+**Milestone 3 — Variety & combat (done):** the car now drives on the ground and
+**jumps** (no more floating), and ↑/↓ **aim the weapon** instead of moving the
+car. Four enemy types — **Runner**, **Brute** (big, tanky), **Lobber** (throws
+arcing rocks you can shoot down or jump), and **Flyer** (winged, aim up to hit)
+— plus a spiky **ground hazard** to jump. A **hearts** health system with
+invulnerability blink, and a **Game Over → retry** screen (you keep your scrap).
+
+Next up — **Milestone 4:** finish Level 1 — the **Goblin Drummer** mini-boss and
+**Big Chief Gloop** boss, with music & SFX. See the roadmap in `GAME_DESIGN.md`.
 
 ## Tech
 
