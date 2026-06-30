@@ -376,16 +376,24 @@ export default class GameScene extends Phaser.Scene {
     this.nextMegaAt = time + Phaser.Math.Between(MEGA.everyMin, MEGA.everyMax);
   }
 
-  // Bolt-on top turrets auto-fire straight ahead for extra firepower.
+  // Bolt-on top turrets auto-fire toward the enemy band, so their shots angle
+  // down and actually hit ground enemies instead of flying over them.
   fireTurrets(time) {
     const muzzles = this.car.getData('turretMuzzles');
     if (!muzzles || !muzzles.length) return;
     if (time - this.lastTurretAt < TURRET_COOLDOWN) return;
     this.lastTurretAt = time;
+
+    const targetY = GROUND_TOP_Y - 30; // roughly the middle of a ground enemy
+    const reach = 520; // how far ahead the shots converge
     muzzles.forEach((m) => {
-      const b = this.bullets.create(this.car.x + m.x, this.car.y + m.y, 'shot-crossbow');
+      const mx = this.car.x + m.x;
+      const my = this.car.y + m.y;
+      const ang = Math.atan2(targetY - my, reach);
+      const b = this.bullets.create(mx, my, 'shot-crossbow');
       b.body.setAllowGravity(false);
-      b.setVelocityX(TURRET_SPEED);
+      b.setRotation(ang);
+      b.setVelocity(Math.cos(ang) * TURRET_SPEED, Math.sin(ang) * TURRET_SPEED);
       b.setData('dmg', 1);
     });
   }

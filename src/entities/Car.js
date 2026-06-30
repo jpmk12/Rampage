@@ -1,12 +1,10 @@
 import { getBody, getWeapon } from '../data/catalog.js';
 
-// Where bolt-on turrets sit on top of the car (relative to the bottom-center
-// origin). Up to three.
-const TURRET_SLOTS = [
-  { x: 8, y: -64 },
-  { x: -18, y: -60 },
-  { x: 32, y: -58 },
-];
+// Bolt-on turrets stack vertically into a tower on the roof (relative to the
+// bottom-center origin). Each one sits on top of the previous.
+const TURRET_X = 4;
+const TURRET_BASE_Y = -58; // first turret's base sits here
+const TURRET_STACK = 30; // each turret stacks this much higher
 
 // Builds a car as a Phaser Container = body + weapon (+ any top turrets), so
 // the loadout can change visually just by rebuilding it. The container's origin
@@ -40,13 +38,12 @@ export function buildCar(scene, x, y, bodyId, weaponId, turrets = 0) {
 // Bolt a turret onto the top of the car (used at build time and live when a
 // mega enemy is defeated). Pushes its muzzle offset onto `turretMuzzles`.
 export function addTurret(scene, container, index) {
-  const slot = TURRET_SLOTS[Math.min(index, TURRET_SLOTS.length - 1)];
-  const t = scene.add.image(slot.x, slot.y, 'turret').setOrigin(0.5, 1);
+  const y = TURRET_BASE_Y - index * TURRET_STACK;
+  const t = scene.add.image(TURRET_X, y, 'turret').setOrigin(0.5, 1);
   container.add(t);
-  // keep the weapon sprite rendered above the turrets if needed; turrets are
-  // small and sit on top of the hull, which reads fine.
   const muzzles = container.getData('turretMuzzles');
-  muzzles.push({ x: slot.x + 14, y: slot.y - 12 });
+  // muzzle = barrel tip of this turret (texture is 48x42, origin bottom-center)
+  muzzles.push({ x: TURRET_X + 22, y: y - 20 });
   container.setData('turretMuzzles', muzzles);
   return t;
 }

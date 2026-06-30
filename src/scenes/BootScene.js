@@ -624,23 +624,27 @@ export default class BootScene extends Phaser.Scene {
     g.destroy();
   }
 
-  // Bolt-on top turret: a little gun on a base, barrel pointing right.
-  // Anchored at the bottom-center so it sits on top of the hull.
+  // Bolt-on top turret: a chunky gun on a base, barrel pointing right.
+  // Anchored at the bottom-center so it sits on (and stacks on) the hull.
   makeTurret(key) {
-    const W = 32;
-    const H = 28;
+    const W = 48;
+    const H = 42;
     const g = this.add.graphics();
-    // base
+    // base plate
+    g.fillStyle(0x3a3f47, 1);
+    g.fillRoundedRect(8, 30, 30, 10, 4);
     g.fillStyle(0x4a4f57, 1);
-    g.fillRoundedRect(6, 18, 20, 10, 3);
+    g.fillRoundedRect(10, 24, 26, 12, 4);
     // dome
     g.fillStyle(0x6b727d, 1);
-    g.fillCircle(14, 16, 8);
+    g.fillCircle(22, 22, 13);
     g.fillStyle(0x9aa0ab, 1);
-    g.fillCircle(12, 14, 3);
+    g.fillCircle(17, 17, 4);
     // barrel pointing right
     g.fillStyle(0x33383f, 1);
-    g.fillRoundedRect(14, 12, 18, 6, 2);
+    g.fillRoundedRect(22, 16, 24, 10, 3);
+    g.fillStyle(0x55606b, 1);
+    g.fillRoundedRect(42, 14, 6, 14, 2);
     g.generateTexture(key, W, H);
     g.destroy();
   }
