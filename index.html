@@ -2,6 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Always revalidate this entry document so a new deploy is picked up
+         instead of a stale index.html pointing at deleted JS bundles (which
+         shows as a blank screen). The hashed JS/CSS it links stay cacheable. -->
+    <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
