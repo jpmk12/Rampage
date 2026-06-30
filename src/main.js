@@ -28,6 +28,10 @@ const config = {
 
 const game = new Phaser.Game(config);
 
+// Tell the startup-error overlay (in index.html) that the game booted, so it
+// stops treating later errors as a fatal "couldn't start" blank screen.
+window.__GAME_OK__ = true;
+
 // Expose for quick debugging / automated smoke tests in the browser console.
 window.__PHASER_GAME__ = game;
 window.__PLAYER__ = Player;

@@ -37,10 +37,82 @@
         /* keep the canvas crisp for our chunky cartoon art */
         image-rendering: pixelated;
       }
+      #fatal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        padding: 24px;
+        box-sizing: border-box;
+        background: #1b1d2a;
+        color: #ffe9b0;
+        text-align: center;
+      }
+      #fatal h1 {
+        margin: 0;
+        font-size: 22px;
+        color: #ff7a7a;
+      }
+      #fatal .msg {
+        max-width: 640px;
+        font-size: 16px;
+        line-height: 1.5;
+        color: #ffffff;
+        white-space: pre-wrap;
+      }
+      #fatal code {
+        background: #2a2d3f;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
     </style>
   </head>
   <body>
     <div id="game"></div>
+    <div id="fatal">
+      <h1>🚗 Rampage couldn't start</h1>
+      <div class="msg"></div>
+    </div>
+
+    <!-- Classic (non-module) script so it runs even if the module below fails
+         to load. Turns a silent blank screen into a readable message. -->
+    <script>
+      (function () {
+        function show(title, msg) {
+          var el = document.getElementById('fatal');
+          if (!el) return;
+          if (title) el.querySelector('h1').textContent = title;
+          el.querySelector('.msg').textContent = msg;
+          el.style.display = 'flex';
+        }
+        // Opened by double-clicking the file? Modules are blocked over file://
+        if (location.protocol === 'file:') {
+          show(
+            '🚗 Run Rampage from a local server',
+            'Rampage can’t be opened directly as a file — web browsers block it.\n\n' +
+              'In a terminal, from the project folder, run:\n\n' +
+              '    npm install\n    npm run dev\n\n' +
+              'then open the http://localhost link it prints.'
+          );
+          return;
+        }
+        // Surface load/runtime errors that happen before the game boots.
+        window.addEventListener('error', function (e) {
+          if (window.__GAME_OK__) return;
+          var where = e.filename ? '\n\n' + e.filename + ':' + e.lineno : '';
+          show(null, (e.message || 'Unknown error') + where);
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+          if (window.__GAME_OK__) return;
+          var r = e.reason;
+          show(null, 'Error: ' + (r && r.message ? r.message : String(r)));
+        });
+      })();
+    </script>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
