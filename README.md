@@ -1,5 +1,7 @@
 # Rampage 🚗💥
 
+![Rampage — a gun-tower tank blasting bolts, rockets, and missiles at a boss and a horde of goblins in the Freestyle bonus round](./docs/hero.png)
+
 A kid-friendly side-scrolling car combat & upgrade game. Drive a junky
 cardboard car across five wild lands, smash silly monsters, collect supplies,
 and upgrade your way to a rocket-firing battle tank.
