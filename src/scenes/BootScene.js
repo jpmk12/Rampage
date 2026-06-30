@@ -40,6 +40,8 @@ export default class BootScene extends Phaser.Scene {
     this.makeBolt('bolt');
     this.makeAxle('axle');
     this.makeTurret('turret');
+    this.makeCloud('cloud');
+    this.makeSun('sun');
     this.makeHeart('heart', true);
     this.makeHeart('heart-empty', false);
     this.makeDrummer('drummer');
@@ -827,6 +829,37 @@ export default class BootScene extends Phaser.Scene {
     g.fillStyle(0x5a4222, 1);
     g.fillEllipse(20, H - 4, 44, 16);
     g.generateTexture(key, W, H);
+    g.destroy();
+  }
+
+  // Fluffy cloud made of overlapping soft blobs (tinted per biome at use).
+  makeCloud(key) {
+    const W = 150;
+    const H = 64;
+    const g = this.add.graphics();
+    g.fillStyle(0xffffff, 0.85);
+    const blobs = [
+      [40, 40, 26], [72, 32, 32], [104, 42, 24], [58, 46, 22], [90, 48, 20],
+    ];
+    blobs.forEach(([x, y, r]) => g.fillCircle(x, y, r));
+    g.fillStyle(0xffffff, 1);
+    g.fillRoundedRect(30, 40, 90, 18, 9);
+    g.generateTexture(key, W, H);
+    g.destroy();
+  }
+
+  // Soft glowing sun/moon disc (tinted per biome at use).
+  makeSun(key) {
+    const S = 150;
+    const c = 75;
+    const g = this.add.graphics();
+    for (let i = 6; i >= 1; i--) {
+      g.fillStyle(0xffffff, 0.1 + (6 - i) * 0.02);
+      g.fillCircle(c, c, 30 + i * 7);
+    }
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(c, c, 34);
+    g.generateTexture(key, S, S);
     g.destroy();
   }
 

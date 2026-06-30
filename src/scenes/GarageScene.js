@@ -33,6 +33,7 @@ export default class GarageScene extends Phaser.Scene {
     this.buildPreview();
     this.buildShelves();
     this.buildRollOut();
+    this.cameras.main.fadeIn(300, 32, 35, 63);
   }
 
   buildBackdrop() {
@@ -295,7 +296,8 @@ export default class GarageScene extends Phaser.Scene {
     bg.on('pointerout', () => btn.setScale(1));
     bg.on('pointerdown', () => {
       Player.nextLevel();
-      this.scene.start('Game');
+      this.cameras.main.fadeOut(240, 27, 29, 42);
+      this.time.delayedCall(250, () => this.scene.start('Game'));
     });
 
     // gentle attention pulse

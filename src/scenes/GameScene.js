@@ -33,6 +33,15 @@ const TURRET_SPEED = 780;
 // Mega enemies: rare, big, tanky; defeating one bolts on a turret.
 const MEGA = { firstAt: 9000, everyMin: 16000, everyMax: 24000, scale: 1.9, speed: 95 };
 
+// Per-biome sun/moon and cloud tints for the sky.
+const SKY_TINT = {
+  1: { sun: 0xfff3b0, cloud: 0xffffff },
+  2: { sun: 0xd6d2e6, cloud: 0xb9b0c8 }, // moon over the swamp
+  3: { sun: 0xffd98a, cloud: 0xf6ead0 },
+  4: { sun: 0xeaf4ff, cloud: 0xffffff },
+  5: { sun: 0xff7a3a, cloud: 0x8a5a4a }, // smoky volcano sky
+};
+
 // Aim limits: mostly upward (negative = up on screen) so you can hit flyers.
 const AIM = { min: -1.15, max: 0.45, rate: 0.0026, topZ: 70, botZ: GROUND_TOP_Y };
 
@@ -90,11 +99,38 @@ export default class GameScene extends Phaser.Scene {
     sound.startMusic();
     this.events.once('shutdown', () => sound.stopMusic());
     this.events.once('destroy', () => sound.stopMusic());
+
+    this.cameras.main.fadeIn(300, 27, 29, 42);
+    this.lastDustAt = 0;
+  }
+
+  // Fade out, then switch scenes (smoother than a hard cut).
+  go(key, data) {
+    this.cameras.main.fadeOut(240, 27, 29, 42);
+    this.time.delayedCall(250, () => this.scene.start(key, data));
   }
 
   buildBackground() {
     const id = this.levelId;
     this.add.image(0, 0, `sky-${id}`).setOrigin(0, 0).setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
+
+    // sun / moon, tinted per biome
+    const sunTint = SKY_TINT[id].sun;
+    this.add.image(720, 110, 'sun').setTint(sunTint).setScale(1.15).setAlpha(0.9);
+
+    // a few drifting parallax clouds
+    this.clouds = [];
+    const cloudTint = SKY_TINT[id].cloud;
+    for (let i = 0; i < 4; i++) {
+      const c = this.add
+        .image(Math.random() * GAME_WIDTH, 50 + Math.random() * 150, 'cloud')
+        .setTint(cloudTint)
+        .setScale(0.6 + Math.random() * 0.7)
+        .setAlpha(0.5 + Math.random() * 0.4);
+      c.setData('speed', 0.006 + Math.random() * 0.014);
+      this.clouds.push(c);
+    }
+
     this.farHills = this.add
       .tileSprite(0, GROUND_TOP_Y - 150, GAME_WIDTH, 150, `hills-far-${id}`)
       .setOrigin(0, 0);
@@ -104,6 +140,16 @@ export default class GameScene extends Phaser.Scene {
     this.ground = this.add
       .tileSprite(0, GROUND_TOP_Y, GAME_WIDTH, 90, `ground-${id}`)
       .setOrigin(0, 0);
+  }
+
+  updateClouds(delta) {
+    this.clouds.forEach((c) => {
+      c.x -= c.getData('speed') * delta;
+      if (c.x < -120) {
+        c.x = GAME_WIDTH + 120;
+        c.y = 50 + Math.random() * 150;
+      }
+    });
   }
 
   buildCar(profile) {
@@ -137,7 +183,8 @@ export default class GameScene extends Phaser.Scene {
     this.input.on('pointerdown', (p) => {
       if (this.muteHit(p)) return;
       if (this.state === 'over') {
-        this.scene.restart();
+        this.cameras.main.fadeOut(240, 27, 29, 42);
+        this.time.delayedCall(250, () => this.scene.restart());
         return;
       }
       if (this.state !== 'playing') return;
@@ -222,6 +269,12 @@ export default class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(21)
       .setVisible(false);
+
+    // red full-screen flash for taking damage
+    this.hurtFlash = this.add
+      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0xff2a2a, 1)
+      .setDepth(24)
+      .setAlpha(0);
   }
 
   toggleMute() {
@@ -252,7 +305,9 @@ export default class GameScene extends Phaser.Scene {
       }
       this.handleFiring(time);
       this.fireTurrets(time);
+      this.emitDust(time);
     }
+    this.updateClouds(delta);
     this.updateCarPhysics(delta);
     this.updateAim(delta);
     this.updateGoblins(time);
@@ -260,6 +315,48 @@ export default class GameScene extends Phaser.Scene {
     this.updateScraps(delta);
     this.updateHazards(delta);
     this.cullBullets();
+  }
+
+  // A little dust kicked up behind the wheels as the car drives.
+  emitDust(time) {
+    if (!this.onGround || time - this.lastDustAt < 130) return;
+    this.lastDustAt = time;
+    const d = this.add
+      .image(this.car.x - 44, CAR.groundY - 6, 'puff')
+      .setTint(0xded2b8)
+      .setScale(0.5)
+      .setAlpha(0.7)
+      .setDepth(4);
+    this.tweens.add({
+      targets: d,
+      x: d.x - 26,
+      y: d.y - 14,
+      alpha: 0,
+      scale: 0.2,
+      duration: 420,
+      onComplete: () => d.destroy(),
+    });
+  }
+
+  // A burst of dust when the car lands from a jump.
+  landPuff() {
+    for (let i = 0; i < 5; i++) {
+      const dir = i < 3 ? -1 : 1;
+      const d = this.add
+        .image(this.car.x + dir * 20, CAR.groundY - 4, 'puff')
+        .setTint(0xded2b8)
+        .setScale(0.6)
+        .setDepth(4);
+      this.tweens.add({
+        targets: d,
+        x: d.x + dir * (20 + Math.random() * 20),
+        y: d.y - 10,
+        alpha: 0,
+        scale: 0.2,
+        duration: 360,
+        onComplete: () => d.destroy(),
+      });
+    }
   }
 
   scrollWorld(delta) {
@@ -301,6 +398,7 @@ export default class GameScene extends Phaser.Scene {
         this.car.y = CAR.groundY;
         this.carVY = 0;
         this.onGround = true;
+        this.landPuff();
       }
     }
     // tilt slightly while airborne for juice
@@ -578,6 +676,8 @@ export default class GameScene extends Phaser.Scene {
     this.invulnUntil = this.time.now + COMBAT.invuln;
     sound.hurt();
     this.cameras.main.shake(180, 0.006);
+    this.hurtFlash.setAlpha(0.4);
+    this.tweens.add({ targets: this.hurtFlash, alpha: 0, duration: 320 });
     this.renderHearts();
 
     // blink the car while invulnerable
@@ -901,7 +1001,7 @@ export default class GameScene extends Phaser.Scene {
 
     const earned = Player.state.scrap - this.levelStartScrap;
     Player.save();
-    this.time.delayedCall(2400, () => this.scene.start('Garage', { earned }));
+    this.time.delayedCall(2400, () => this.go('Garage', { earned }));
   }
 
   freezeEnemies() {
@@ -978,12 +1078,24 @@ export default class GameScene extends Phaser.Scene {
     shot.body.setAllowGravity(false);
     shot.setVelocity(Math.cos(this.aim) * this.weapon.speed, Math.sin(this.aim) * this.weapon.speed);
     sound.shoot();
+    this.muzzleFlash(mx, my);
 
     this.tweens.add({
       targets: this.car,
       x: { from: CAR.x - 4, to: CAR.x },
       duration: 90,
       ease: 'Quad.easeOut',
+    });
+  }
+
+  muzzleFlash(x, y) {
+    const f = this.add.image(x, y, 'puff').setTint(0xffe08a).setScale(0.7).setDepth(6);
+    this.tweens.add({
+      targets: f,
+      scale: 0.2,
+      alpha: 0,
+      duration: 110,
+      onComplete: () => f.destroy(),
     });
   }
 
