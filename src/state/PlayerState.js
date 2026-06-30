@@ -13,9 +13,12 @@ function freshDefault() {
     ownedBodies: ['cardboard'],
     ownedWeapons: ['bow'],
     unlockedParts: [], // special boss-drop parts that gate some upgrades
+    turrets: 0, // bolt-on top turrets earned from mega enemies
     muted: false,
   };
 }
+
+export const MAX_TURRETS = 3;
 
 function load() {
   try {
@@ -97,6 +100,14 @@ export const Player = {
   setMuted(m) {
     data.muted = m;
     this.save();
+  },
+
+  // Returns true if a turret was added, false if already at the cap.
+  addTurret() {
+    if (data.turrets >= MAX_TURRETS) return false;
+    data.turrets += 1;
+    this.save();
+    return true;
   },
 
   reset() {

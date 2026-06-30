@@ -17,11 +17,21 @@ import { Player } from '../state/PlayerState.js';
 import { getBody, getWeapon } from '../data/catalog.js';
 import { pickEnemyType } from '../data/enemies.js';
 import { getLevel, LAST_LEVEL } from '../data/levels.js';
-import { buildCar, muzzleFor } from '../entities/Car.js';
+import { buildCar, muzzleFor, addTurret } from '../entities/Car.js';
 import { sound } from '../audio/Sound.js';
 
 const MINI_SUMMON_EVERY = 1900; // ms between mini-boss summons
 const BOSS_THROW_EVERY = 1600; // ms between boss projectile throws
+
+// Hazards you must jump over are disabled for now (per request).
+const HAZARDS_ENABLED = false;
+
+// Bolt-on turrets (earned from mega enemies) fire straight ahead.
+const TURRET_COOLDOWN = 300; // ms between turret volleys
+const TURRET_SPEED = 780;
+
+// Mega enemies: rare, big, tanky; defeating one bolts on a turret.
+const MEGA = { firstAt: 9000, everyMin: 16000, everyMax: 24000, scale: 1.9, speed: 95 };
 
 // Aim limits: mostly upward (negative = up on screen) so you can hit flyers.
 const AIM = { min: -1.15, max: 0.45, rate: 0.0026, topZ: 70, botZ: GROUND_TOP_Y };
@@ -69,6 +79,7 @@ export default class GameScene extends Phaser.Scene {
     this.buildHud();
     this.nextSpawnAt = this.time.now + ENEMY.firstSpawnDelay;
     this.nextHazardAt = this.time.now + Phaser.Math.Between(HAZARD.everyMin, HAZARD.everyMax);
+    this.nextMegaAt = this.time.now + MEGA.firstAt;
 
     this.physics.add.overlap(this.bullets, this.goblins, this.onBulletHit, null, this);
     this.physics.add.overlap(this.bullets, this.enemyShots, this.onShootRock, null, this);
@@ -96,9 +107,10 @@ export default class GameScene extends Phaser.Scene {
   }
 
   buildCar(profile) {
-    this.car = buildCar(this, CAR.x, CAR.groundY, profile.body, profile.weapon);
+    this.car = buildCar(this, CAR.x, CAR.groundY, profile.body, profile.weapon, profile.turrets);
     this.car.setDepth(5);
     this.weaponSprite = this.car.getData('weaponSprite');
+    this.lastTurretAt = 0;
   }
 
   buildGroups() {
@@ -231,11 +243,13 @@ export default class GameScene extends Phaser.Scene {
         this.scrollWorld(delta);
         this.advanceLevel(delta);
         this.maybeSpawnGoblin(time);
-        this.maybeSpawnHazard(time);
+        if (HAZARDS_ENABLED) this.maybeSpawnHazard(time);
+        this.maybeSpawnMega(time);
       } else {
         this.updateBoss(time, delta);
       }
       this.handleFiring(time);
+      this.fireTurrets(time);
     }
     this.updateCarPhysics(delta);
     this.updateAim(delta);
@@ -336,6 +350,61 @@ export default class GameScene extends Phaser.Scene {
     this.nextSpawnAt = time + gap;
   }
 
+  // Rare, big, tanky enemy. Defeating it bolts a turret onto the car.
+  maybeSpawnMega(time) {
+    if (this.distance >= LEVEL.length - 1500) return; // not right before the boss
+    if (time < this.nextMegaAt) return;
+
+    const hp = 12 + this.level * 4;
+    const type = { key: 'mega', lane: 'ground', clearH: 999, scrap: 4, mega: true, speed: MEGA.speed };
+    const e = this.goblins.create(GAME_WIDTH + 90, GROUND_TOP_Y + 2, `brute-${this.levelId}`);
+    e.setOrigin(0.5, 1).setScale(MEGA.scale);
+    e.body.setAllowGravity(false);
+    e.setVelocityX(-MEGA.speed);
+    e.setData('type', type);
+    e.setData('hp', hp);
+    e.setData('maxHp', hp);
+    e.setData('seed', Math.random() * Math.PI * 2);
+
+    // floating health bar
+    const bg = this.add.rectangle(e.x, 0, 72, 9, 0x1b1d2a, 0.7).setDepth(7);
+    const fill = this.add.rectangle(e.x - 34, 0, 68, 5, 0xe2483a, 1).setOrigin(0, 0.5).setDepth(8);
+    e.setData('hpbar', { bg, fill });
+
+    this.nextMegaAt = time + Phaser.Math.Between(MEGA.everyMin, MEGA.everyMax);
+  }
+
+  // Bolt-on top turrets auto-fire straight ahead for extra firepower.
+  fireTurrets(time) {
+    const muzzles = this.car.getData('turretMuzzles');
+    if (!muzzles || !muzzles.length) return;
+    if (time - this.lastTurretAt < TURRET_COOLDOWN) return;
+    this.lastTurretAt = time;
+    muzzles.forEach((m) => {
+      const b = this.bullets.create(this.car.x + m.x, this.car.y + m.y, 'shot-crossbow');
+      b.body.setAllowGravity(false);
+      b.setVelocityX(TURRET_SPEED);
+      b.setData('dmg', 1);
+    });
+  }
+
+  // Destroy an enemy and clean up its attached health bar, if any.
+  removeEnemy(e) {
+    const bar = e.getData('hpbar');
+    if (bar) {
+      bar.bg.destroy();
+      bar.fill.destroy();
+    }
+    e.destroy();
+  }
+
+  updateMegaBar(e) {
+    const bar = e.getData('hpbar');
+    if (!bar) return;
+    const frac = Math.max(0, e.getData('hp') / e.getData('maxHp'));
+    bar.fill.width = 68 * frac;
+  }
+
   updateGoblins(time) {
     const carCY = this.carCenterY();
     this.goblins.children.iterate((e) => {
@@ -353,6 +422,16 @@ export default class GameScene extends Phaser.Scene {
         }
       }
 
+      // keep a mega's health bar floating above it
+      if (type.mega) {
+        const bar = e.getData('hpbar');
+        if (bar) {
+          const topY = e.y - e.displayHeight - 12;
+          bar.bg.setPosition(e.x, topY);
+          bar.fill.setPosition(e.x - 34, topY);
+        }
+      }
+
       // reached the car?
       if (this.state === 'playing' && Math.abs(e.x - this.car.x) < 40) {
         const hitsAir = type.lane === 'air' && Math.abs(e.y - carCY) < 48;
@@ -360,13 +439,13 @@ export default class GameScene extends Phaser.Scene {
         const hitsGround = type.lane !== 'air' && airborne < type.clearH;
         if (hitsAir || hitsGround) {
           this.poof(e.x, type.lane === 'air' ? e.y : e.y - 24, COLORS.goblin);
-          e.destroy();
+          this.removeEnemy(e);
           this.damageCar(COMBAT.contactDamage);
           return true;
         }
       }
 
-      if (e.x < -90) e.destroy();
+      if (e.x < -90) this.removeEnemy(e);
       return true;
     });
   }
@@ -412,10 +491,12 @@ export default class GameScene extends Phaser.Scene {
   }
 
   onBulletHit(bullet, goblin) {
+    const dmg = bullet.getData('dmg') || this.weapon.damage;
     bullet.destroy();
-    const hp = goblin.getData('hp') - this.weapon.damage;
+    const hp = goblin.getData('hp') - dmg;
     if (hp > 0) {
       goblin.setData('hp', hp);
+      this.updateMegaBar(goblin);
       goblin.setTintFill(0xffffff);
       this.time.delayedCall(60, () => goblin.active && goblin.clearTint());
       return;
@@ -428,10 +509,27 @@ export default class GameScene extends Phaser.Scene {
     const yy = type.lane === 'air' ? goblin.y : goblin.y - 26;
     sound.defeat();
     this.poof(goblin.x, yy, COLORS.goblin);
+    if (type.mega) this.poof(goblin.x, yy, 0xffe14d);
     for (let i = 0; i < (type.scrap || 1); i++) {
       this.spawnScrap(goblin.x + Phaser.Math.Between(-12, 12), yy + Phaser.Math.Between(-8, 8));
     }
-    goblin.destroy();
+    this.removeEnemy(goblin);
+    if (type.mega) this.rewardTurret();
+  }
+
+  // Mega defeated → bolt a turret on (live), or bonus scrap if already maxed.
+  rewardTurret() {
+    if (Player.addTurret()) {
+      addTurret(this, this.car, Player.state.turrets - 1);
+      sound.win();
+      this.bannerFlash('⚙  TURRET UNLOCKED — extra firepower!', '#9fe6a0');
+    } else {
+      sound.win();
+      this.bannerFlash('MEGA SMASHED!  +scrap', '#ffe14d');
+      for (let i = 0; i < 6; i++) {
+        this.spawnScrap(this.car.x + 220 + i * 8, GROUND_TOP_Y - 30);
+      }
+    }
   }
 
   poof(x, y, color) {
@@ -643,9 +741,10 @@ export default class GameScene extends Phaser.Scene {
   }
 
   onBulletHitBoss(bullet, boss) {
+    const dmg = bullet.getData('dmg') || this.weapon.damage;
     bullet.destroy();
     if (!boss.active) return;
-    const hp = boss.getData('hp') - this.weapon.damage;
+    const hp = boss.getData('hp') - dmg;
     boss.setData('hp', Math.max(0, hp));
     this.updateBossBar();
     sound.bossHit();

@@ -102,7 +102,14 @@ export default class GarageScene extends Phaser.Scene {
 
   refreshPreview() {
     if (this.preview) this.preview.destroy();
-    this.preview = buildCar(this, this.previewX, this.previewY, Player.state.body, Player.state.weapon);
+    this.preview = buildCar(
+      this,
+      this.previewX,
+      this.previewY,
+      Player.state.body,
+      Player.state.weapon,
+      Player.state.turrets
+    );
     this.preview.setScale(1.9);
     // a little "clunk" pop whenever the loadout changes
     this.tweens.add({

@@ -39,6 +39,7 @@ export default class BootScene extends Phaser.Scene {
     this.makePuff('puff');
     this.makeBolt('bolt');
     this.makeAxle('axle');
+    this.makeTurret('turret');
     this.makeHeart('heart', true);
     this.makeHeart('heart-empty', false);
     this.makeDrummer('drummer');
@@ -620,6 +621,27 @@ export default class BootScene extends Phaser.Scene {
     g.moveTo(26, 12); g.lineTo(6, 20);
     g.strokePath();
     g.generateTexture(key, S, S);
+    g.destroy();
+  }
+
+  // Bolt-on top turret: a little gun on a base, barrel pointing right.
+  // Anchored at the bottom-center so it sits on top of the hull.
+  makeTurret(key) {
+    const W = 32;
+    const H = 28;
+    const g = this.add.graphics();
+    // base
+    g.fillStyle(0x4a4f57, 1);
+    g.fillRoundedRect(6, 18, 20, 10, 3);
+    // dome
+    g.fillStyle(0x6b727d, 1);
+    g.fillCircle(14, 16, 8);
+    g.fillStyle(0x9aa0ab, 1);
+    g.fillCircle(12, 14, 3);
+    // barrel pointing right
+    g.fillStyle(0x33383f, 1);
+    g.fillRoundedRect(14, 12, 18, 6, 2);
+    g.generateTexture(key, W, H);
     g.destroy();
   }
 

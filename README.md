@@ -48,8 +48,13 @@ The car drives itself and **auto-fires**. You aim and jump.
 | Aim up / down | ↑ / ↓ | Drag on the right half |
 | Jump | Space or W | Tap the left half |
 
-Aim up to shoot flyers, jump over ground hazards and to leap short goblins,
-and shoot lobbers' rocks out of the air (or just jump them).
+Aim up to shoot flyers, leap short goblins, and shoot lobbers' rocks out of the
+air (or just jump them). Jump-over ground hazards are currently disabled.
+
+**Mega enemies & turrets:** every now and then a big, tough **mega enemy** rolls
+in with its own health bar. Defeat one and it bolts an extra **gun turret** onto
+the roof of your car (up to three) — each fires straight ahead for extra
+firepower, and they stick with you for the rest of the run.
 
 ## Status
 
