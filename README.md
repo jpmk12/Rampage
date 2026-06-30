@@ -137,7 +137,9 @@ shoot, and enjoy the ride. A "👶 KID MODE" badge shows in the HUD when it's on
 `public/assets/sprites/` and register in `src/data/assets.js` automatically
 replaces the matching code-drawn placeholder — no gameplay changes. See
 **[docs/ASSETS.md](./docs/ASSETS.md)** for the full list of art keys, sizes, and
-where to get free/CC0 art that fits.
+where to get free/CC0 art that fits — or
+**[docs/AI_PROMPTS.md](./docs/AI_PROMPTS.md)** for a ready-to-paste prompt pack
+(and AI-tool recommendations) to generate the whole art family yourself.
 
 See **[docs/ART_UPGRADE.md](./docs/ART_UPGRADE.md)** for the broader plan
 (animation, shaders, etc.). Other possible next steps: a cosmetic sticker shop.
