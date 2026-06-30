@@ -23,6 +23,22 @@ npm run build    # outputs to dist/
 npm run preview  # serve the production build locally
 ```
 
+## Play online (GitHub Pages)
+
+The game is a built site — you can't point GitHub Pages at the raw source
+(`index.html` imports Phaser as a module the browser can't resolve, so you'd
+get a blank screen). The included workflow handles the build for you:
+
+1. In the repo, go to **Settings → Pages**.
+2. Under **Build and deployment → Source**, choose **GitHub Actions**.
+3. Push to `main` (or this branch) — the
+   [`Deploy to GitHub Pages`](.github/workflows/deploy.yml) workflow builds the
+   game and publishes it. Watch progress in the **Actions** tab.
+4. When it finishes, your game is live at
+   `https://<your-username>.github.io/<repo-name>/`.
+
+Re-running happens automatically on every push.
+
 ## Controls
 
 | Action | Keyboard | Touch |
