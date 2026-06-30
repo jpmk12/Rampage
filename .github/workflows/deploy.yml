@@ -39,6 +39,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Turns Pages on automatically (Source = GitHub Actions) if it isn't
+      # already, so no manual repo setting is needed.
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
       - name: Build
         run: npm run build
 
