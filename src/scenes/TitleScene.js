@@ -83,8 +83,14 @@ export default class TitleScene extends Phaser.Scene {
       this.time.delayedCall(270, () => this.scene.start('Game'));
     });
 
+    // Kid Mode (invincible) toggle
+    this.kidBtn = this.smallButton(GAME_WIDTH / 2, 392, this.kidLabel(), () => {
+      Player.setLittleKid(!Player.state.littleKid);
+      this.kidBtn.setText(this.kidLabel());
+    });
+
     if (cont) {
-      this.smallButton(GAME_WIDTH / 2, 384, 'New Game', () => {
+      this.smallButton(GAME_WIDTH / 2, 430, 'New Game', () => {
         Player.reset();
         this.scene.restart();
       });
@@ -98,6 +104,10 @@ export default class TitleScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setAlpha(0.6);
+  }
+
+  kidLabel() {
+    return `👶 Kid Mode (no losing): ${Player.state.littleKid ? 'ON' : 'OFF'}`;
   }
 
   bigButton(x, y, label, color, onClick) {

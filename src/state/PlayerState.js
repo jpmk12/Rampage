@@ -15,6 +15,7 @@ function freshDefault() {
     unlockedParts: [], // special boss-drop parts that gate some upgrades
     turrets: 0, // bolt-on top turrets earned from mega enemies
     muted: false,
+    littleKid: false, // invincible mode for young players
   };
 }
 
@@ -99,6 +100,11 @@ export const Player = {
 
   setMuted(m) {
     data.muted = m;
+    this.save();
+  },
+
+  setLittleKid(v) {
+    data.littleKid = v;
     this.save();
   },
 

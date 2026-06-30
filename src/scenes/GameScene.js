@@ -287,6 +287,17 @@ export default class GameScene extends Phaser.Scene {
     for (let i = 0; i < this.maxHealth; i++) {
       this.hearts.push(this.add.image(28 + i * 30, 84, 'heart').setDepth(20));
     }
+    if (Player.state.littleKid) {
+      this.add
+        .text(28 + this.maxHealth * 30, 72, '👶 KID MODE', {
+          fontFamily: 'system-ui, sans-serif',
+          fontSize: '16px',
+          color: '#9fe6a0',
+          stroke: '#1b1d2a',
+          strokeThickness: 3,
+        })
+        .setDepth(20);
+    }
 
     this.add.image(GAME_WIDTH - 120, 26, 'scrap').setScale(1.1).setDepth(20);
     this.scrapText = this.add
@@ -747,10 +758,24 @@ export default class GameScene extends Phaser.Scene {
     if (this.state !== 'playing') return;
     if (this.time.now < this.invulnUntil) return;
 
-    this.health -= amount;
     this.invulnUntil = this.time.now + COMBAT.invuln;
     sound.hurt();
-    this.cameras.main.shake(180, 0.006);
+    this.cameras.main.shake(140, 0.005);
+
+    // Kid Mode: the car is just briefly stunned, never damaged or destroyed.
+    if (Player.state.littleKid) {
+      this.tweens.add({
+        targets: this.car,
+        alpha: { from: 0.4, to: 1 },
+        duration: 130,
+        yoyo: true,
+        repeat: 2,
+        onComplete: () => this.car && this.car.setAlpha(1),
+      });
+      return;
+    }
+
+    this.health -= amount;
     this.hurtFlash.setAlpha(0.4);
     this.tweens.add({ targets: this.hurtFlash, alpha: 0, duration: 320 });
     this.renderHearts();

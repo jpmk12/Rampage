@@ -120,9 +120,14 @@ swamp spores, blowing sand, falling snow, rising embers), a sun/moon and
 drifting clouds, wheel dust, muzzle flashes, a damage flash, and smooth scene
 fades.
 
+**Kid Mode (done):** an invincible mode for young players, toggled on the title
+screen. The car can still be bumped (it flashes and gets briefly stunned) but
+never loses hearts and there's no Game Over — so little kids can just drive,
+shoot, and enjoy the ride. A "👶 KID MODE" badge shows in the HUD when it's on.
+
 See **[docs/ART_UPGRADE.md](./docs/ART_UPGRADE.md)** for the plan to take the
 graphics further (real sprite assets, animation, shaders, etc.). Other possible
-next steps: a cosmetic sticker shop and a Little-Kid (no-death) mode toggle.
+next steps: a cosmetic sticker shop.
 
 ## Tech
 
