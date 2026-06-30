@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, GROUND_TOP_Y, SCROLL, FONTS } from '../config.js';
+import { GAME_WIDTH, GAME_HEIGHT, GROUND_TOP_Y, SCROLL, FONTS, CAR } from '../config.js';
 import { Player } from '../state/PlayerState.js';
 import { buildCar } from '../entities/Car.js';
 import { sound } from '../audio/Sound.js';
@@ -49,7 +49,7 @@ export default class TitleScene extends Phaser.Scene {
 
   buildCar() {
     const p = Player.state;
-    this.car = buildCar(this, 220, GROUND_TOP_Y - 10, p.body, p.weapon, p.turrets);
+    this.car = buildCar(this, 220, CAR.groundY, p.body, p.weapon, p.turrets);
     this.car.setScale(1.3).setDepth(5);
   }
 

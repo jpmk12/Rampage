@@ -20,8 +20,8 @@ export const WORLD_SCROLL = 0.32;
 
 export const CAR = {
   x: 160, // fixed horizontal position; the world scrolls past it
-  groundY: GROUND_TOP_Y - 10, // resting y (wheels on the ground)
-  startY: GROUND_TOP_Y - 10,
+  groundY: GROUND_TOP_Y + 3, // resting y (wheels on the road, level with enemies)
+  startY: GROUND_TOP_Y + 3,
   jumpVel: 1.05, // upward launch speed, px/ms
   gravity: 0.0045, // px/ms^2 pulling the car back down
 };

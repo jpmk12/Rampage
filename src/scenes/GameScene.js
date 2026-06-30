@@ -241,6 +241,16 @@ export default class GameScene extends Phaser.Scene {
     return (f.guns || 0) + (f.spread || 0) + (f.rockets || 0) + (f.missiles || 0) + (f.bombs || 0);
   }
 
+  // Overall power index — drives how many/how tough the enemies and bosses get.
+  fsPower() {
+    const f = this.fs;
+    return this.fsTotalWeapons() + (f.power || 0) + (f.fireRate || 0) + (f.heart || 0);
+  }
+
+  fsHpMult() {
+    return 1 + this.fsPower() * 0.13;
+  }
+
   // Rebuild the car so its visible gun count matches the arsenal.
   refreshFreestyleCar() {
     const y = this.car.y;
@@ -442,6 +452,7 @@ export default class GameScene extends Phaser.Scene {
       if (this.freestyle) {
         this.scrollWorld(delta);
         this.freestyleSpawns(time);
+        if (this.boss) this.updateBoss(time);
         this.fireArsenal(time);
       } else {
         if (this.phase === 'travel') {
@@ -602,7 +613,7 @@ export default class GameScene extends Phaser.Scene {
     e.body.setAllowGravity(false);
     e.setVelocityX(-type.speed);
     e.setData('type', type);
-    e.setData('hp', type.hp);
+    e.setData('hp', this.freestyle ? Math.ceil(type.hp * this.fsHpMult()) : type.hp);
     e.setData('seed', Math.random() * Math.PI * 2);
     if (type.lane === 'air') e.setData('baseY', y);
     if (type.lobs) e.setData('nextLob', this.time.now + Phaser.Math.Between(600, 1200));
@@ -617,18 +628,39 @@ export default class GameScene extends Phaser.Scene {
       this.fsStart = time;
       this.nextFsSpawn = time + 500;
       this.nextFsMega = time + 8000;
+      this.nextBossAt = 12; // first boss at score 12
+      this.fsBossCount = 0;
     }
     const mins = (time - this.fsStart) / 60000;
-    const gap = Math.max(150, 700 - mins * 220);
+    const pw = this.fsPower();
+
+    // spawn faster and in bigger bunches as you grow more powerful
+    const gap = Math.max(110, 640 - mins * 160 - pw * 32);
     if (time >= this.nextFsSpawn) {
-      this.spawnEnemy(pickEnemyType(Math.random));
-      if (Math.random() < Math.min(0.65, mins * 0.35)) this.spawnEnemy(pickEnemyType(Math.random));
-      this.nextFsSpawn = time + Phaser.Math.Between(gap, gap + 220);
+      const burst = 1 + (Math.random() < Math.min(0.8, mins * 0.3 + pw * 0.05) ? 1 : 0) + (pw >= 6 && Math.random() < 0.4 ? 1 : 0);
+      for (let i = 0; i < burst; i++) this.spawnEnemy(pickEnemyType(Math.random));
+      this.nextFsSpawn = time + Phaser.Math.Between(gap, gap + 200);
     }
+
+    // megas come more often as power rises
     if (time >= this.nextFsMega) {
       this.spawnFreestyleMega();
-      this.nextFsMega = time + Phaser.Math.Between(11000, 17000);
+      const megaGap = Math.max(5000, 14000 - pw * 700);
+      this.nextFsMega = time + Phaser.Math.Between(megaGap, megaGap + 4000);
     }
+
+    // bosses arrive as you rack up the score / power
+    if (!this.boss && this.score >= this.nextBossAt) {
+      this.spawnFreestyleBoss();
+    }
+  }
+
+  spawnFreestyleBoss() {
+    const cfg = getLevel((this.fsBossCount % LAST_LEVEL) + 1).boss;
+    const hp = Math.round(cfg.hp * (1 + this.fsPower() * 0.22) + this.score * 0.6);
+    this.fsBossCount += 1;
+    this.bannerFlash(`⚠  BOSS: ${cfg.name}!`, '#ff7a7a');
+    this.spawnBoss({ tex: cfg.tex, name: cfg.name, hp, role: 'boss', x: 700, projTex: cfg.projTex });
   }
 
   spawnFreestyleMega() {
@@ -1379,6 +1411,20 @@ export default class GameScene extends Phaser.Scene {
       this.time.delayedCall(i * 90, () =>
         this.poof(bx + Phaser.Math.Between(-40, 40), by + Phaser.Math.Between(-30, 30), 0xffe14d)
       );
+    }
+
+    if (this.freestyle) {
+      // big reward + schedule the next, tougher boss
+      this.score += 10;
+      this.scoreText.setText('SCORE ' + this.score);
+      Player.setFreestyleBest(this.score);
+      const drops = 3 + Math.floor(this.fsBossCount / 2);
+      for (let i = 0; i < drops; i++) {
+        this.dropPickup(bx + Phaser.Math.Between(-60, 60), by - Phaser.Math.Between(0, 30));
+      }
+      this.bannerFlash('BOSS DOWN!  +loot', '#9fe6a0');
+      this.nextBossAt = this.score + 14 + this.fsBossCount * 4;
+      return;
     }
 
     if (spec.role === 'mini') {
