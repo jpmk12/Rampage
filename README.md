@@ -86,9 +86,26 @@ Wooden Wagon in the Garage. Plus the first **audio**: a synthesized chiptune
 loop and sound effects (shoot, jump, pickup, hits, explosions, win/lose
 jingles) — all generated in code, no audio files — with a 🔊 **mute toggle**.
 
-Next up — **Milestone 5:** the remaining biomes — Zombie Flats, Bandit
-Badlands, Frostbite Peaks, and Volcano Fortress — each with its own enemies,
-hazards, and boss. See the roadmap in `GAME_DESIGN.md`.
+**Milestone 5 — The full adventure (done):** all **five levels** are in, each a
+distinct biome (data-driven from `src/data/levels.js`) with recoloured enemies,
+its own hazard, a mini-boss, and a boss:
+
+| Level | Biome | Boss | Unlocks |
+|-------|-------|------|---------|
+| 1 | Goblin Greenwood 🌳 | Big Chief Gloop | Wooden Wagon |
+| 2 | Zombie Flats 🧟 | Mayor Moldy | Iron Buggy |
+| 3 | Bandit Badlands 🏜️ | Sheriff Snaketail | Armored Truck |
+| 4 | Frostbite Peaks ❄️ | Frost King Yeti | Battle Tank |
+| 5 | Volcano Fortress 🌋 | King Krang | 🏆 Champion! |
+
+The upgrade tree is complete: **5 car bodies** (Cardboard Cart → Wooden Wagon →
+Iron Buggy → Armored Truck → Battle Tank, each gated behind a boss drop) and
+**5 weapons** (Bow → Crossbow → Catapult → Cannon → Rocket). Beating the final
+boss rolls the victory/Champion ending. It's a complete game — all art and
+audio still generated in code, no binary assets.
+
+Possible next steps: cosmetic sticker shop, a Little-Kid (no-death) mode toggle,
+real sprite/audio assets, and a title screen. See `GAME_DESIGN.md`.
 
 ## Tech
 

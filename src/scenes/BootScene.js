@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config.js';
+import { GAME_WIDTH, GAME_HEIGHT } from '../config.js';
+import { LEVELS } from '../data/levels.js';
 
 // BootScene generates all placeholder art as in-code textures so the project
 // has zero binary assets for now. We'll swap these for real sprites later.
@@ -9,52 +10,67 @@ export default class BootScene extends Phaser.Scene {
   }
 
   create() {
-    this.makeSky('sky', GAME_WIDTH, GAME_HEIGHT);
-    this.makeHill('hills-far', 360, 150, COLORS.farHills, 0.55);
-    this.makeHill('hills-near', 300, 210, COLORS.nearHills, 0.7);
-    this.makeGround('ground', 256, 90);
-
     // car bodies (progressively cooler)
     this.makeBodyCardboard('body-cardboard');
     this.makeBodyWood('body-wood');
     this.makeBodyIron('body-iron');
+    this.makeBodyArmored('body-armored');
+    this.makeBodyTank('body-tank');
 
     // weapon icons that mount on the car
     this.makeWeaponBow('wpn-bow');
     this.makeWeaponCrossbow('wpn-crossbow');
     this.makeWeaponCatapult('wpn-catapult');
+    this.makeWeaponCannon('wpn-cannon');
+    this.makeWeaponRocket('wpn-rocket');
 
     // projectiles
     this.makeShotBow('shot-bow');
     this.makeShotCrossbow('shot-crossbow');
     this.makeShotCatapult('shot-catapult');
+    this.makeShotCannon('shot-cannon');
+    this.makeShotRocket('shot-rocket');
 
-    // enemies & fx
-    this.makeGoblin('goblin');
-    this.makeBrute('brute');
-    this.makeLobber('lobber');
-    this.makeFlyer('flyer');
-    this.makeDrummer('drummer');
-    this.makeGloop('gloop');
-    this.makeCabbage('cabbage');
-    this.makeAxle('axle');
+    // shared fx / pickups / bosses
     this.makeEnemyRock('enemy-rock');
-    this.makeHazard('hazard');
+    this.makeCabbage('cabbage');
     this.makeScrap('scrap');
     this.makeFlag('flag');
     this.makePuff('puff');
     this.makeBolt('bolt');
+    this.makeAxle('axle');
     this.makeHeart('heart', true);
     this.makeHeart('heart-empty', false);
+    this.makeDrummer('drummer');
+    this.makeGloop('gloop');
+    this.makeBossMoldy('boss-moldy');
+    this.makeBossSnaketail('boss-snaketail');
+    this.makeBossYeti('boss-yeti');
+    this.makeBossKrang('boss-krang');
+
+    // per-level biome backgrounds, reskinned enemies, hazards, projectiles
+    LEVELS.forEach((lv) => {
+      const b = lv.biome;
+      this.makeSky(`sky-${lv.id}`, GAME_WIDTH, GAME_HEIGHT, b.skyTop, b.skyBottom);
+      this.makeHill(`hills-far-${lv.id}`, 360, 150, b.far, 0.55);
+      this.makeHill(`hills-near-${lv.id}`, 300, 210, b.near, 0.7);
+      this.makeGround(`ground-${lv.id}`, 256, 90, b.ground, b.groundEdge);
+      this.makeRunner(`runner-${lv.id}`, lv.enemyPal);
+      this.makeBrute(`brute-${lv.id}`, lv.enemyPal);
+      this.makeLobber(`lobber-${lv.id}`, lv.enemyPal);
+      this.makeFlyer(`flyer-${lv.id}`, lv.enemyPal);
+      this.makeHazard(`hazard-${lv.id}`, lv.hazardStyle);
+      this.makeProjBall(`proj-${lv.id}`, lv.projColor);
+    });
 
     this.scene.start('Game');
   }
 
   // Vertical gradient sky, drawn one scanline at a time (cheap, runs once).
-  makeSky(key, w, h) {
+  makeSky(key, w, h, topColor, bottomColor) {
     const g = this.add.graphics();
-    const top = Phaser.Display.Color.IntegerToColor(COLORS.skyTop);
-    const bottom = Phaser.Display.Color.IntegerToColor(COLORS.skyBottom);
+    const top = Phaser.Display.Color.IntegerToColor(topColor);
+    const bottom = Phaser.Display.Color.IntegerToColor(bottomColor);
     for (let y = 0; y < h; y++) {
       const t = y / h;
       const c = Phaser.Display.Color.Interpolate.ColorWithColor(top, bottom, 100, t * 100);
@@ -87,20 +103,20 @@ export default class BootScene extends Phaser.Scene {
   }
 
   // Dirt band with a grassy top edge and evenly spaced road dashes (tiles).
-  makeGround(key, w, h) {
+  makeGround(key, w, h, groundColor, edgeColor) {
     const g = this.add.graphics();
-    g.fillStyle(COLORS.ground, 1);
+    g.fillStyle(groundColor, 1);
     g.fillRect(0, 0, w, h);
-    g.fillStyle(COLORS.groundEdge, 1);
+    g.fillStyle(edgeColor, 1);
     g.fillRect(0, 0, w, 12);
     // road dashes
-    g.fillStyle(0xf2e6b8, 1);
+    g.fillStyle(0xf2e6b8, 0.85);
     const dashY = 34;
     for (let x = 16; x < w; x += 64) {
       g.fillRect(x, dashY, 32, 6);
     }
-    // a few darker dirt specks for texture
-    g.fillStyle(COLORS.ground - 0x0a0a06, 1);
+    // a few darker specks for texture
+    g.fillStyle(Math.max(0, groundColor - 0x0a0a06), 1);
     for (let i = 0; i < 14; i++) {
       const sx = (i * 53) % (w - 8);
       const sy = 50 + ((i * 29) % (h - 56));
@@ -113,7 +129,7 @@ export default class BootScene extends Phaser.Scene {
   // All bodies share a 124x92 canvas with the wheels at the bottom, so they
   // line up on the ground and the weapon mount points stay consistent.
   drawWheels(g, leftX, rightX, radius, hubColor) {
-    g.fillStyle(COLORS.wheel, 1);
+    g.fillStyle(0x2b2b33, 1);
     g.fillCircle(leftX, 78, radius);
     g.fillCircle(rightX, 78, radius);
     g.fillStyle(hubColor, 1);
@@ -135,9 +151,9 @@ export default class BootScene extends Phaser.Scene {
   makeBodyCardboard(key) {
     const g = this.add.graphics();
     this.drawWheels(g, 36, 92, 15, 0x55555f);
-    g.fillStyle(COLORS.cardboard, 1);
+    g.fillStyle(0xc18a42, 1);
     g.fillRoundedRect(16, 38, 92, 36, 6);
-    g.lineStyle(3, COLORS.cardboardDark, 1);
+    g.lineStyle(3, 0x9c6a2c, 1);
     g.strokeRoundedRect(16, 38, 92, 36, 6);
     g.beginPath();
     g.moveTo(62, 38);
@@ -276,9 +292,9 @@ export default class BootScene extends Phaser.Scene {
     g.destroy();
   }
 
-  // A silly, non-scary goblin that faces left (toward the car). Big eyes,
-  // pointy ears, a little club. Drawn into ~64x66.
-  makeGoblin(key) {
+  // A silly, non-scary "runner" baddie that faces left (toward the car).
+  // Recoloured per biome via the palette. Drawn into ~64x66.
+  makeRunner(key, pal) {
     const W = 64;
     const H = 66;
     const g = this.add.graphics();
@@ -290,33 +306,33 @@ export default class BootScene extends Phaser.Scene {
     g.fillCircle(6, 30, 7);
 
     // ears
-    g.fillStyle(COLORS.goblin, 1);
+    g.fillStyle(pal.body, 1);
     g.fillTriangle(16, 18, 16, 36, 2, 24);
     g.fillTriangle(48, 18, 48, 36, 62, 24);
 
     // body
-    g.fillStyle(COLORS.goblin, 1);
+    g.fillStyle(pal.body, 1);
     g.fillRoundedRect(16, 26, 34, 34, 10);
     // belly
-    g.fillStyle(COLORS.goblinBelly, 1);
+    g.fillStyle(pal.belly, 1);
     g.fillRoundedRect(24, 38, 18, 18, 8);
     // legs
-    g.fillStyle(COLORS.goblinDark, 1);
+    g.fillStyle(pal.dark, 1);
     g.fillRoundedRect(20, 56, 9, 8, 3);
     g.fillRoundedRect(36, 56, 9, 8, 3);
     // head
-    g.fillStyle(COLORS.goblin, 1);
+    g.fillStyle(pal.body, 1);
     g.fillRoundedRect(18, 8, 30, 24, 10);
 
     // eyes (big and goofy)
-    g.fillStyle(0xffffff, 1);
+    g.fillStyle(pal.eye, 1);
     g.fillCircle(28, 19, 7);
     g.fillCircle(40, 19, 7);
-    g.fillStyle(0x222222, 1);
+    g.fillStyle(pal.pupil, 1);
     g.fillCircle(26, 20, 3.2);
     g.fillCircle(38, 20, 3.2);
     // angry-but-silly eyebrows
-    g.lineStyle(3, COLORS.goblinDark, 1);
+    g.lineStyle(3, pal.dark, 1);
     g.beginPath();
     g.moveTo(22, 11);
     g.lineTo(32, 15);
@@ -324,7 +340,7 @@ export default class BootScene extends Phaser.Scene {
     g.lineTo(36, 15);
     g.strokePath();
     // grin with a tooth
-    g.lineStyle(3, 0x2c4a16, 1);
+    g.lineStyle(3, pal.dark, 1);
     g.beginPath();
     g.moveTo(28, 27);
     g.lineTo(38, 27);
@@ -336,8 +352,8 @@ export default class BootScene extends Phaser.Scene {
     g.destroy();
   }
 
-  // Brute — a big, bulky goblin. Tough, slow, can't be jumped over. ~96x96.
-  makeBrute(key) {
+  // Brute — a big, bulky baddie. Tough, slow, can't be jumped over. ~96x96.
+  makeBrute(key, pal) {
     const W = 96;
     const H = 96;
     const g = this.add.graphics();
@@ -347,31 +363,31 @@ export default class BootScene extends Phaser.Scene {
     g.fillStyle(0x5e4523, 1);
     g.fillCircle(8, 40, 11);
     // ears
-    g.fillStyle(0x5f9a2f, 1);
+    g.fillStyle(pal.body, 1);
     g.fillTriangle(24, 24, 24, 50, 4, 34);
     g.fillTriangle(72, 24, 72, 50, 92, 34);
     // body
-    g.fillStyle(0x5f9a2f, 1);
+    g.fillStyle(pal.body, 1);
     g.fillRoundedRect(22, 34, 54, 50, 14);
     // belly
-    g.fillStyle(0x86c04e, 1);
+    g.fillStyle(pal.belly, 1);
     g.fillRoundedRect(34, 50, 30, 28, 12);
     // legs
-    g.fillStyle(0x4a7d22, 1);
+    g.fillStyle(pal.dark, 1);
     g.fillRoundedRect(28, 80, 14, 12, 4);
     g.fillRoundedRect(54, 80, 14, 12, 4);
     // head
-    g.fillStyle(0x5f9a2f, 1);
+    g.fillStyle(pal.body, 1);
     g.fillRoundedRect(28, 8, 42, 32, 12);
     // eyes
-    g.fillStyle(0xffffff, 1);
+    g.fillStyle(pal.eye, 1);
     g.fillCircle(42, 22, 8);
     g.fillCircle(58, 22, 8);
-    g.fillStyle(0x222222, 1);
+    g.fillStyle(pal.pupil, 1);
     g.fillCircle(40, 24, 3.6);
     g.fillCircle(56, 24, 3.6);
     // angry brows
-    g.lineStyle(4, 0x3c641a, 1);
+    g.lineStyle(4, pal.dark, 1);
     g.beginPath();
     g.moveTo(34, 12);
     g.lineTo(48, 18);
@@ -386,8 +402,8 @@ export default class BootScene extends Phaser.Scene {
     g.destroy();
   }
 
-  // Lobber — a goblin hoisting a rock overhead to throw. ~62x74.
-  makeLobber(key) {
+  // Lobber — hoists a rock overhead to throw. ~62x74.
+  makeLobber(key, pal) {
     const W = 62;
     const H = 74;
     const g = this.add.graphics();
@@ -397,31 +413,31 @@ export default class BootScene extends Phaser.Scene {
     g.fillStyle(0x6b6f78, 1);
     g.fillCircle(34, 9, 5);
     // arm up to the rock
-    g.lineStyle(5, 0x7aa83c, 1);
+    g.lineStyle(5, pal.body, 1);
     g.beginPath();
     g.moveTo(30, 40);
     g.lineTo(38, 16);
     g.strokePath();
     // ears
-    g.fillStyle(0x7aa83c, 1);
+    g.fillStyle(pal.body, 1);
     g.fillTriangle(16, 26, 16, 42, 4, 32);
     // body
-    g.fillStyle(0x7aa83c, 1);
+    g.fillStyle(pal.body, 1);
     g.fillRoundedRect(14, 34, 30, 30, 9);
-    g.fillStyle(0xa6d36a, 1);
+    g.fillStyle(pal.belly, 1);
     g.fillRoundedRect(20, 44, 16, 16, 7);
     // legs
-    g.fillStyle(0x5f8a2c, 1);
+    g.fillStyle(pal.dark, 1);
     g.fillRoundedRect(18, 60, 8, 10, 3);
     g.fillRoundedRect(30, 60, 8, 10, 3);
     // head
-    g.fillStyle(0x7aa83c, 1);
+    g.fillStyle(pal.body, 1);
     g.fillRoundedRect(14, 14, 26, 22, 9);
     // eyes
-    g.fillStyle(0xffffff, 1);
+    g.fillStyle(pal.eye, 1);
     g.fillCircle(22, 24, 6);
     g.fillCircle(33, 24, 6);
-    g.fillStyle(0x222222, 1);
+    g.fillStyle(pal.pupil, 1);
     g.fillCircle(20, 25, 2.8);
     g.fillCircle(31, 25, 2.8);
     g.generateTexture(key, W, H);
@@ -429,31 +445,31 @@ export default class BootScene extends Phaser.Scene {
   }
 
   // Flyer — a little winged imp. Faces left, flaps. ~74x52.
-  makeFlyer(key) {
+  makeFlyer(key, pal) {
     const W = 74;
     const H = 52;
     const g = this.add.graphics();
     // wings
-    g.fillStyle(0x8a5bb0, 1);
+    g.fillStyle(pal.dark, 1);
     g.fillTriangle(40, 24, 72, 6, 70, 30);
     g.fillTriangle(40, 24, 64, 26, 70, 44);
     // body
-    g.fillStyle(0xa06fc8, 1);
+    g.fillStyle(pal.body, 1);
     g.fillRoundedRect(18, 14, 30, 26, 10);
     // tail
-    g.fillStyle(0x8a5bb0, 1);
+    g.fillStyle(pal.dark, 1);
     g.fillTriangle(46, 22, 46, 32, 60, 27);
     // head
-    g.fillStyle(0xa06fc8, 1);
+    g.fillStyle(pal.body, 1);
     g.fillRoundedRect(8, 12, 22, 20, 8);
     // ears
     g.fillTriangle(12, 12, 18, 12, 13, 2);
     g.fillTriangle(22, 12, 28, 12, 27, 2);
     // eyes
-    g.fillStyle(0xffffff, 1);
+    g.fillStyle(pal.eye, 1);
     g.fillCircle(15, 22, 5);
     g.fillCircle(24, 22, 5);
-    g.fillStyle(0x222222, 1);
+    g.fillStyle(pal.pupil, 1);
     g.fillCircle(13, 23, 2.4);
     g.fillCircle(22, 23, 2.4);
     // little fangs
@@ -639,24 +655,82 @@ export default class BootScene extends Phaser.Scene {
   }
 
   // Ground hazard — a spiky rock/log pile to jump over. Anchored at bottom.
-  makeHazard(key) {
+  makeHazard(key, style) {
     const W = 76;
-    const H = 52;
+    const H = 56;
     const g = this.add.graphics();
-    // log
-    g.fillStyle(0x7a5a30, 1);
-    g.fillRoundedRect(6, 26, 64, 24, 8);
-    g.fillStyle(0x5e4523, 1);
-    g.fillCircle(12, 38, 9);
-    g.fillStyle(0x8a6a3a, 1);
-    g.fillCircle(12, 38, 4);
-    // spikes
-    g.fillStyle(0xcfd3da, 1);
-    for (let i = 0; i < 4; i++) {
-      const x = 18 + i * 14;
-      g.fillTriangle(x, 28, x + 12, 28, x + 6, 8);
+
+    if (style === 'tombstone') {
+      g.fillStyle(0x9aa0ab, 1);
+      g.fillRoundedRect(16, 14, 44, 42, 6);
+      g.fillStyle(0x7c828c, 1);
+      g.fillRoundedRect(16, 14, 44, 42, 6);
+      g.fillStyle(0x9aa0ab, 1);
+      g.fillRect(16, 28, 44, 28);
+      g.lineStyle(3, 0x6b7078, 1);
+      g.beginPath();
+      g.moveTo(28, 26); g.lineTo(48, 26);
+      g.moveTo(38, 26); g.lineTo(38, 46);
+      g.strokePath();
+    } else if (style === 'cactus') {
+      g.fillStyle(0x4f9a3c, 1);
+      g.fillRoundedRect(30, 8, 16, 48, 6);
+      g.fillRoundedRect(14, 26, 14, 10, 4);
+      g.fillRoundedRect(14, 18, 10, 20, 4);
+      g.fillRoundedRect(48, 30, 14, 10, 4);
+      g.fillRoundedRect(52, 22, 10, 20, 4);
+      g.fillStyle(0x3c7d2c, 1);
+      for (let y = 14; y < 52; y += 8) g.fillRect(37, y, 2, 4);
+    } else if (style === 'ice') {
+      g.fillStyle(0xbfe6f5, 1);
+      for (let i = 0; i < 4; i++) {
+        const x = 12 + i * 16;
+        g.fillTriangle(x, 56, x + 14, 56, x + 7, 8 + (i % 2) * 10);
+      }
+      g.fillStyle(0xe6f6ff, 0.7);
+      for (let i = 0; i < 4; i++) {
+        const x = 12 + i * 16;
+        g.fillTriangle(x + 4, 56, x + 10, 56, x + 7, 16 + (i % 2) * 10);
+      }
+    } else if (style === 'lava') {
+      g.fillStyle(0x2e2622, 1);
+      g.fillRoundedRect(6, 30, 64, 26, 8);
+      g.fillStyle(0xff7a3a, 1);
+      g.fillRoundedRect(10, 44, 56, 10, 4);
+      g.fillStyle(0xffd24d, 1);
+      for (let i = 0; i < 5; i++) g.fillCircle(16 + i * 12, 40, 3);
+      g.fillStyle(0x4a3a36, 1);
+      for (let i = 0; i < 3; i++) g.fillTriangle(18 + i * 20, 30, 30 + i * 20, 30, 24 + i * 20, 16);
+    } else {
+      // 'log' (default) — spiky log
+      g.fillStyle(0x7a5a30, 1);
+      g.fillRoundedRect(6, 30, 64, 24, 8);
+      g.fillStyle(0x5e4523, 1);
+      g.fillCircle(12, 42, 9);
+      g.fillStyle(0x8a6a3a, 1);
+      g.fillCircle(12, 42, 4);
+      g.fillStyle(0xcfd3da, 1);
+      for (let i = 0; i < 4; i++) {
+        const x = 18 + i * 14;
+        g.fillTriangle(x, 32, x + 12, 32, x + 6, 12);
+      }
     }
     g.generateTexture(key, W, H);
+    g.destroy();
+  }
+
+  // A round, biome-coloured boss projectile.
+  makeProjBall(key, color) {
+    const S = 30;
+    const g = this.add.graphics();
+    const dark = Math.max(0, color - 0x222222);
+    g.fillStyle(dark, 1);
+    g.fillCircle(15, 15, 14);
+    g.fillStyle(color, 1);
+    g.fillCircle(15, 15, 11);
+    g.fillStyle(0xffffff, 0.5);
+    g.fillCircle(11, 11, 3);
+    g.generateTexture(key, S, S);
     g.destroy();
   }
 
@@ -686,11 +760,11 @@ export default class BootScene extends Phaser.Scene {
   makeScrap(key) {
     const S = 26;
     const g = this.add.graphics();
-    g.fillStyle(COLORS.scrapDark, 1);
+    g.fillStyle(0xc9961f, 1);
     g.fillCircle(13, 13, 12);
-    g.fillStyle(COLORS.scrap, 1);
+    g.fillStyle(0xf4c542, 1);
     g.fillCircle(13, 13, 9);
-    g.fillStyle(COLORS.scrapDark, 1);
+    g.fillStyle(0xc9961f, 1);
     g.fillCircle(13, 13, 4);
     // shine
     g.fillStyle(0xfff3c4, 1);
@@ -734,9 +808,9 @@ export default class BootScene extends Phaser.Scene {
   makePuff(key) {
     const S = 24;
     const g = this.add.graphics();
-    g.fillStyle(COLORS.puff, 0.5);
+    g.fillStyle(0xffffff, 0.5);
     g.fillCircle(12, 12, 11);
-    g.fillStyle(COLORS.puff, 1);
+    g.fillStyle(0xffffff, 1);
     g.fillCircle(12, 12, 7);
     g.generateTexture(key, S, S);
     g.destroy();
@@ -745,9 +819,9 @@ export default class BootScene extends Phaser.Scene {
   // Projectiles ---------------------------------------------------------
   makeShotBow(key) {
     const g = this.add.graphics();
-    g.fillStyle(COLORS.bullet, 1);
+    g.fillStyle(0xffd34d, 1);
     g.fillRoundedRect(0, 2, 16, 6, 3);
-    g.fillStyle(COLORS.bulletEdge, 1);
+    g.fillStyle(0xe88f1a, 1);
     g.fillTriangle(14, 0, 14, 10, 22, 5);
     g.generateTexture(key, 22, 10);
     g.destroy();
@@ -807,6 +881,304 @@ export default class BootScene extends Phaser.Scene {
     g.fillStyle(0x9aa0ab, 1);
     g.fillTriangle(10, 38, 10, 50, 2, 44);
     g.generateTexture(key, 86, 76);
+    g.destroy();
+  }
+
+  makeShotCannon(key) {
+    const g = this.add.graphics();
+    g.fillStyle(0x3a3d44, 1);
+    g.fillCircle(10, 10, 9);
+    g.fillStyle(0x6b6f78, 1);
+    g.fillCircle(7, 7, 3.5);
+    g.generateTexture(key, 20, 20);
+    g.destroy();
+  }
+
+  makeShotRocket(key) {
+    const g = this.add.graphics();
+    g.fillStyle(0xe04a3a, 1);
+    g.fillRoundedRect(0, 3, 18, 8, 3);
+    g.fillStyle(0xcfd3da, 1);
+    g.fillTriangle(16, 1, 16, 13, 26, 7);
+    g.fillStyle(0xffd24d, 1);
+    g.fillTriangle(0, 3, 0, 11, -6, 7); // exhaust flame
+    g.generateTexture(key, 28, 14);
+    g.destroy();
+  }
+
+  // Tier 4 — Armored Truck: heavy plated pickup with bull bars. 124x92.
+  makeBodyArmored(key) {
+    const g = this.add.graphics();
+    this.drawWheels(g, 38, 96, 18, 0x9aa0ab);
+    // hull
+    g.fillStyle(0x5b626d, 1);
+    g.fillRoundedRect(8, 30, 108, 48, 8);
+    g.fillStyle(0x474d57, 1);
+    g.fillRoundedRect(8, 56, 108, 22, 8);
+    g.lineStyle(3, 0x33383f, 1);
+    g.strokeRoundedRect(8, 30, 108, 48, 8);
+    // armored cab
+    g.fillStyle(0x6b727d, 1);
+    g.fillRoundedRect(26, 20, 40, 20, 4);
+    g.fillStyle(0x9fd0e8, 1);
+    g.fillRoundedRect(32, 24, 28, 12, 3);
+    // bull bars (front, right side)
+    g.lineStyle(5, 0x9aa0ab, 1);
+    g.beginPath();
+    g.moveTo(116, 40); g.lineTo(124, 40);
+    g.moveTo(116, 56); g.lineTo(124, 56);
+    g.moveTo(122, 36); g.lineTo(122, 60);
+    g.strokePath();
+    // rivets
+    g.fillStyle(0x33383f, 1);
+    for (let x = 16; x < 112; x += 16) { g.fillCircle(x, 36, 2.4); g.fillCircle(x, 72, 2.4); }
+    this.drawFlag(g, 18, 6, 0xff7a3a);
+    g.generateTexture(key, 124, 92);
+    g.destroy();
+  }
+
+  // Tier 5 — Battle Tank: treads, turret, antenna flag. 124x92.
+  makeBodyTank(key) {
+    const g = this.add.graphics();
+    // tread base
+    g.fillStyle(0x33383f, 1);
+    g.fillRoundedRect(6, 64, 112, 24, 12);
+    g.fillStyle(0x1f2329, 1);
+    for (let x = 16; x < 112; x += 16) g.fillCircle(x, 76, 5);
+    g.fillStyle(0x55606b, 1);
+    g.fillCircle(20, 76, 9);
+    g.fillCircle(104, 76, 9);
+    // hull
+    g.fillStyle(0x556070, 1);
+    g.fillRoundedRect(14, 40, 96, 30, 8);
+    g.lineStyle(3, 0x39404a, 1);
+    g.strokeRoundedRect(14, 40, 96, 30, 8);
+    // turret
+    g.fillStyle(0x6b7888, 1);
+    g.fillRoundedRect(34, 24, 52, 24, 10);
+    g.fillStyle(0x4a5460, 1);
+    g.fillRoundedRect(40, 30, 40, 12, 6);
+    // rivets
+    g.fillStyle(0x39404a, 1);
+    for (let x = 22; x < 104; x += 14) g.fillCircle(x, 50, 2.2);
+    this.drawFlag(g, 28, 4, 0xffd34d);
+    g.generateTexture(key, 124, 92);
+    g.destroy();
+  }
+
+  makeWeaponCannon(key) {
+    const g = this.add.graphics();
+    g.fillStyle(0x4a4f57, 1);
+    g.fillRoundedRect(0, 8, 30, 16, 4);
+    g.fillStyle(0x33383f, 1);
+    g.fillRoundedRect(26, 6, 10, 20, 3); // muzzle ring
+    g.fillStyle(0x6b6f78, 1);
+    g.fillCircle(6, 16, 6);
+    g.generateTexture(key, 40, 32);
+    g.destroy();
+  }
+
+  makeWeaponRocket(key) {
+    const g = this.add.graphics();
+    // launch tube
+    g.fillStyle(0x4f5a48, 1);
+    g.fillRoundedRect(0, 8, 34, 16, 5);
+    g.fillStyle(0x39402f, 1);
+    g.fillRoundedRect(0, 12, 34, 8, 3);
+    // rocket nose poking out
+    g.fillStyle(0xe04a3a, 1);
+    g.fillTriangle(34, 8, 34, 24, 44, 16);
+    g.generateTexture(key, 44, 32);
+    g.destroy();
+  }
+
+  // ---- Bosses (levels 2–5) ----------------------------------------------
+
+  // Mayor Moldy — a tall top-hat zombie. ~150x132.
+  makeBossMoldy(key) {
+    const g = this.add.graphics();
+    // legs
+    g.fillStyle(0x3f4a36, 1);
+    g.fillRoundedRect(54, 96, 16, 34, 5);
+    g.fillRoundedRect(82, 96, 16, 34, 5);
+    // tattered coat
+    g.fillStyle(0x4a5566, 1);
+    g.fillRoundedRect(40, 50, 72, 60, 12);
+    g.fillStyle(0x5b6678, 1);
+    g.fillRoundedRect(62, 56, 26, 50, 8); // shirt
+    // sash
+    g.fillStyle(0xb23b3b, 1);
+    g.fillTriangle(46, 54, 56, 54, 92, 104);
+    // arms
+    g.fillStyle(0x8fae74, 1);
+    g.fillRoundedRect(28, 56, 16, 40, 6);
+    g.fillRoundedRect(108, 56, 16, 40, 6);
+    // head
+    g.fillStyle(0x8fae74, 1);
+    g.fillRoundedRect(54, 14, 44, 40, 12);
+    g.fillStyle(0x7a9a62, 1);
+    g.fillRect(54, 40, 44, 8); // jaw shadow
+    // ears
+    g.fillTriangle(54, 24, 54, 40, 42, 32);
+    g.fillTriangle(98, 24, 98, 40, 110, 32);
+    // top hat
+    g.fillStyle(0x2b2b33, 1);
+    g.fillRect(48, 6, 56, 8);
+    g.fillRect(58, -14, 36, 22);
+    g.fillStyle(0xb23b3b, 1);
+    g.fillRect(58, 2, 36, 4);
+    // eyes (sickly)
+    g.fillStyle(0xf2e9a0, 1);
+    g.fillCircle(68, 30, 7);
+    g.fillCircle(86, 30, 7);
+    g.fillStyle(0x3a3a2a, 1);
+    g.fillCircle(67, 31, 3);
+    g.fillCircle(85, 31, 3);
+    // stitched grin
+    g.lineStyle(3, 0x4a5a38, 1);
+    g.beginPath();
+    g.moveTo(64, 46); g.lineTo(88, 46);
+    for (let x = 66; x < 88; x += 6) { g.moveTo(x, 42); g.lineTo(x, 50); }
+    g.strokePath();
+    g.generateTexture(key, 150, 150);
+    g.destroy();
+  }
+
+  // Sheriff Snaketail — a bandit on a big scorpion. ~160x132.
+  makeBossSnaketail(key) {
+    const g = this.add.graphics();
+    // scorpion body
+    g.fillStyle(0x9c5a2c, 1);
+    g.fillEllipse(76, 96, 96, 44);
+    g.fillStyle(0x7a4420, 1);
+    g.fillEllipse(76, 104, 70, 24);
+    // legs
+    g.lineStyle(5, 0x7a4420, 1);
+    g.beginPath();
+    for (let i = 0; i < 3; i++) { g.moveTo(50 + i * 18, 110); g.lineTo(40 + i * 18, 128); }
+    g.strokePath();
+    // claw (front-left)
+    g.fillStyle(0x9c5a2c, 1);
+    g.fillCircle(24, 92, 14);
+    g.fillTriangle(10, 86, 24, 80, 24, 96);
+    // curled tail with stinger (back, up high)
+    g.lineStyle(12, 0x9c5a2c, 1);
+    g.beginPath();
+    g.moveTo(120, 96);
+    g.lineTo(140, 70);
+    g.lineTo(126, 44);
+    g.strokePath();
+    g.fillStyle(0xe2c34a, 1);
+    g.fillTriangle(118, 44, 134, 44, 126, 26); // stinger
+    // bandit rider
+    g.fillStyle(0xc98f4a, 1);
+    g.fillRoundedRect(60, 44, 34, 36, 10); // body
+    g.fillStyle(0x9c6a2c, 1);
+    g.fillRoundedRect(66, 16, 24, 24, 8); // head
+    // cowboy hat
+    g.fillStyle(0x6b4f2a, 1);
+    g.fillRect(54, 12, 48, 6);
+    g.fillRoundedRect(66, -2, 24, 16, 4);
+    // bandana
+    g.fillStyle(0xb23b3b, 1);
+    g.fillRect(66, 32, 24, 8);
+    // eyes
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(73, 26, 5);
+    g.fillCircle(84, 26, 5);
+    g.fillStyle(0x222222, 1);
+    g.fillCircle(72, 27, 2.4);
+    g.fillCircle(83, 27, 2.4);
+    g.generateTexture(key, 160, 140);
+    g.destroy();
+  }
+
+  // Frost King Yeti — a big armored yeti with an ice crown. ~150x132.
+  makeBossYeti(key) {
+    const g = this.add.graphics();
+    // legs/feet
+    g.fillStyle(0xdfeefb, 1);
+    g.fillRoundedRect(40, 100, 26, 30, 8);
+    g.fillRoundedRect(86, 100, 26, 30, 8);
+    // body fur
+    g.fillStyle(0xeaf4fb, 1);
+    g.fillEllipse(76, 78, 96, 76);
+    g.fillStyle(0xc9e2f2, 1);
+    g.fillEllipse(76, 88, 60, 50);
+    // arms
+    g.fillStyle(0xeaf4fb, 1);
+    g.fillRoundedRect(20, 52, 22, 52, 11);
+    g.fillRoundedRect(110, 52, 22, 52, 11);
+    // head
+    g.fillStyle(0xeaf4fb, 1);
+    g.fillRoundedRect(48, 18, 56, 44, 16);
+    // ice crown
+    g.fillStyle(0x7fc6f0, 1);
+    for (let i = 0; i < 4; i++) {
+      const x = 50 + i * 14;
+      g.fillTriangle(x, 20, x + 12, 20, x + 6, 0);
+    }
+    // eyes (icy blue, angry)
+    g.fillStyle(0x2a5a78, 1);
+    g.fillCircle(66, 38, 7);
+    g.fillCircle(86, 38, 7);
+    g.fillStyle(0x9fe0ff, 1);
+    g.fillCircle(66, 38, 3);
+    g.fillCircle(86, 38, 3);
+    g.lineStyle(4, 0xbfe0f2, 1);
+    g.beginPath();
+    g.moveTo(58, 30); g.lineTo(72, 36);
+    g.moveTo(94, 30); g.lineTo(80, 36);
+    g.strokePath();
+    // tusks
+    g.fillStyle(0xffffff, 1);
+    g.fillTriangle(64, 52, 70, 52, 67, 60);
+    g.fillTriangle(82, 52, 88, 52, 85, 60);
+    g.generateTexture(key, 150, 140);
+    g.destroy();
+  }
+
+  // King Krang — the mecha-goblin warlord (final boss). ~160x140.
+  makeBossKrang(key) {
+    const g = this.add.graphics();
+    // legs
+    g.fillStyle(0x33383f, 1);
+    g.fillRoundedRect(46, 104, 22, 30, 5);
+    g.fillRoundedRect(92, 104, 22, 30, 5);
+    // armored body
+    g.fillStyle(0x5b626d, 1);
+    g.fillRoundedRect(38, 52, 84, 62, 12);
+    g.fillStyle(0x474d57, 1);
+    g.fillRoundedRect(54, 64, 52, 40, 10); // chest plate
+    g.fillStyle(0xff5d4d, 1);
+    g.fillCircle(80, 84, 9); // power core
+    g.fillStyle(0xffd24d, 1);
+    g.fillCircle(80, 84, 4);
+    // shoulder cannons
+    g.fillStyle(0x39404a, 1);
+    g.fillRoundedRect(20, 50, 26, 18, 5);
+    g.fillRoundedRect(114, 50, 26, 18, 5);
+    // head
+    g.fillStyle(0x6b727d, 1);
+    g.fillRoundedRect(56, 16, 48, 38, 10);
+    // horns
+    g.fillStyle(0xcfd3da, 1);
+    g.fillTriangle(56, 18, 64, 18, 48, 2);
+    g.fillTriangle(96, 18, 104, 18, 112, 2);
+    // glowing red eyes
+    g.fillStyle(0xff3a2a, 1);
+    g.fillRoundedRect(64, 30, 12, 8, 2);
+    g.fillRoundedRect(84, 30, 12, 8, 2);
+    g.fillStyle(0xffd24d, 1);
+    g.fillRect(67, 32, 3, 3);
+    g.fillRect(87, 32, 3, 3);
+    // metal grin
+    g.lineStyle(3, 0x2b2b33, 1);
+    g.beginPath();
+    g.moveTo(64, 46); g.lineTo(96, 46);
+    for (let x = 68; x < 96; x += 7) { g.moveTo(x, 42); g.lineTo(x, 50); }
+    g.strokePath();
+    g.generateTexture(key, 160, 140);
     g.destroy();
   }
 }

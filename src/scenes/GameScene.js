@@ -16,14 +16,12 @@ import {
 import { Player } from '../state/PlayerState.js';
 import { getBody, getWeapon } from '../data/catalog.js';
 import { pickEnemyType } from '../data/enemies.js';
+import { getLevel, LAST_LEVEL } from '../data/levels.js';
 import { buildCar, muzzleFor } from '../entities/Car.js';
 import { sound } from '../audio/Sound.js';
 
-// Level-1 boss roster.
-const BOSSES = {
-  drummer: { texture: 'drummer', name: 'Goblin Drummer', hp: 12, x: 740, summonEvery: 1900 },
-  gloop: { texture: 'gloop', name: 'Big Chief Gloop', hp: 34, x: 700, throwEvery: 1600 },
-};
+const MINI_SUMMON_EVERY = 1900; // ms between mini-boss summons
+const BOSS_THROW_EVERY = 1600; // ms between boss projectile throws
 
 // Aim limits: mostly upward (negative = up on screen) so you can hit flyers.
 const AIM = { min: -1.15, max: 0.45, rate: 0.0026, topZ: 70, botZ: GROUND_TOP_Y };
@@ -39,6 +37,10 @@ export default class GameScene extends Phaser.Scene {
   create() {
     const profile = Player.state;
     this.level = profile.level;
+    this.levelCfg = getLevel(this.level);
+    this.levelId = this.levelCfg.id;
+    this.miniSpec = { ...this.levelCfg.mini, role: 'mini', x: 740, projTex: this.levelCfg.boss.projTex };
+    this.bossSpec = { ...this.levelCfg.boss, role: 'boss', x: 700 };
     this.weapon = getWeapon(profile.weapon);
     this.maxHealth = getBody(profile.body).health;
     this.health = this.maxHealth;
@@ -80,15 +82,16 @@ export default class GameScene extends Phaser.Scene {
   }
 
   buildBackground() {
-    this.add.image(0, 0, 'sky').setOrigin(0, 0).setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
+    const id = this.levelId;
+    this.add.image(0, 0, `sky-${id}`).setOrigin(0, 0).setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
     this.farHills = this.add
-      .tileSprite(0, GROUND_TOP_Y - 150, GAME_WIDTH, 150, 'hills-far')
+      .tileSprite(0, GROUND_TOP_Y - 150, GAME_WIDTH, 150, `hills-far-${id}`)
       .setOrigin(0, 0);
     this.nearHills = this.add
-      .tileSprite(0, GROUND_TOP_Y - 210, GAME_WIDTH, 210, 'hills-near')
+      .tileSprite(0, GROUND_TOP_Y - 210, GAME_WIDTH, 210, `hills-near-${id}`)
       .setOrigin(0, 0);
     this.ground = this.add
-      .tileSprite(0, GROUND_TOP_Y, GAME_WIDTH, 90, 'ground')
+      .tileSprite(0, GROUND_TOP_Y, GAME_WIDTH, 90, `ground-${id}`)
       .setOrigin(0, 0);
   }
 
@@ -150,7 +153,9 @@ export default class GameScene extends Phaser.Scene {
       stroke: '#1b1d2a',
       strokeThickness: 4,
     };
-    this.add.text(16, 12, `RAMPAGE — Level ${this.level}`, { ...style, fontSize: '24px' }).setDepth(20);
+    this.add
+      .text(16, 12, `Level ${this.levelId}: ${this.levelCfg.name}`, { ...style, fontSize: '24px' })
+      .setDepth(20);
     this.add
       .text(16, 44, 'Aim: ↑/↓ or drag right   Jump: Space or tap left', {
         ...style,
@@ -314,7 +319,7 @@ export default class GameScene extends Phaser.Scene {
     const x = GAME_WIDTH + 50;
     const y = type.lane === 'air' ? CAR.groundY - 120 : GROUND_TOP_Y + 2;
 
-    const e = this.goblins.create(x, y, type.texture);
+    const e = this.goblins.create(x, y, `${type.key}-${this.levelId}`);
     e.setOrigin(0.5, 1);
     e.body.setAllowGravity(false);
     e.setVelocityX(-type.speed);
@@ -567,27 +572,26 @@ export default class GameScene extends Phaser.Scene {
     this.phase = 'miniboss';
     this.progressFill.width = 256;
     this.bannerFlash('⚠  BOSS INCOMING!  ⚠', '#ff7a7a');
-    this.time.delayedCall(900, () => this.spawnBoss('drummer'));
+    this.time.delayedCall(900, () => this.spawnBoss(this.miniSpec));
   }
 
-  spawnBoss(kind) {
-    const cfg = BOSSES[kind];
-    const b = this.bosses.create(GAME_WIDTH + 140, GROUND_TOP_Y + 6, cfg.texture);
+  spawnBoss(spec) {
+    const b = this.bosses.create(GAME_WIDTH + 160, GROUND_TOP_Y + 6, spec.tex);
     b.setOrigin(0.5, 1).setDepth(5);
     b.body.setAllowGravity(false);
-    b.setData('kind', kind);
-    b.setData('hp', cfg.hp);
-    b.setData('maxHp', cfg.hp);
+    if (spec.scale) b.setScale(spec.scale);
+    b.setData('spec', spec);
+    b.setData('hp', spec.hp);
+    b.setData('maxHp', spec.hp);
     b.setData('fighting', false);
     b.setData('baseY', GROUND_TOP_Y + 6);
     b.setData('nextAttack', 0);
     this.boss = b;
 
-    this.showBossBar(cfg.name);
-    // roll in, then start fighting
+    this.showBossBar(spec.name);
     this.tweens.add({
       targets: b,
-      x: cfg.x,
+      x: spec.x,
       duration: 1100,
       ease: 'Sine.easeOut',
       onComplete: () => {
@@ -599,31 +603,29 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  updateBoss(time, delta) {
+  updateBoss(time) {
     const b = this.boss;
     if (!b || !b.active) return;
-    const kind = b.getData('kind');
-    const cfg = BOSSES[kind];
+    const spec = b.getData('spec');
 
-    // bob in place
     b.y = b.getData('baseY') + Math.sin(time * 0.004) * 6;
 
     if (!b.getData('fighting')) return;
     if (time < b.getData('nextAttack')) return;
 
-    if (kind === 'drummer') {
+    if (spec.role === 'mini') {
       this.summonRunner();
-      b.setData('nextAttack', time + cfg.summonEvery);
+      b.setData('nextAttack', time + MINI_SUMMON_EVERY);
     } else {
       const enraged = b.getData('hp') <= b.getData('maxHp') * 0.5;
-      this.throwCabbage(b);
-      if (enraged) this.time.delayedCall(260, () => b.active && this.throwCabbage(b));
-      b.setData('nextAttack', time + (enraged ? cfg.throwEvery * 0.7 : cfg.throwEvery));
+      this.throwProjectile(b, spec.projTex);
+      if (enraged) this.time.delayedCall(260, () => b.active && this.throwProjectile(b, spec.projTex));
+      b.setData('nextAttack', time + (enraged ? BOSS_THROW_EVERY * 0.7 : BOSS_THROW_EVERY));
     }
   }
 
   summonRunner() {
-    const e = this.goblins.create(GAME_WIDTH + 40, GROUND_TOP_Y + 2, 'goblin');
+    const e = this.goblins.create(GAME_WIDTH + 40, GROUND_TOP_Y + 2, `runner-${this.levelId}`);
     e.setOrigin(0.5, 1);
     e.body.setAllowGravity(false);
     e.setVelocityX(-320);
@@ -632,8 +634,8 @@ export default class GameScene extends Phaser.Scene {
     e.setData('seed', Math.random() * Math.PI * 2);
   }
 
-  throwCabbage(b) {
-    const c = this.enemyShots.create(b.x - 40, b.y - 90, 'cabbage');
+  throwProjectile(b, tex) {
+    const c = this.enemyShots.create(b.x - 40, b.y - 90, tex);
     c.body.setAllowGravity(true);
     c.body.setGravityY(900);
     c.setVelocity(-520, -430);
@@ -653,7 +655,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   defeatBoss(boss) {
-    const kind = boss.getData('kind');
+    const spec = boss.getData('spec');
     const bx = boss.x;
     const by = boss.y - 50;
     boss.destroy();
@@ -666,10 +668,10 @@ export default class GameScene extends Phaser.Scene {
       );
     }
 
-    if (kind === 'drummer') {
+    if (spec.role === 'mini') {
       this.phase = 'boss';
-      this.bannerFlash('Here comes the CHIEF!', '#ffe14d');
-      this.time.delayedCall(1100, () => this.spawnBoss('gloop'));
+      this.bannerFlash(`Here comes ${this.bossSpec.name}!`, '#ffe14d');
+      this.time.delayedCall(1100, () => this.spawnBoss(this.bossSpec));
     } else {
       this.winLevel(true);
     }
@@ -713,28 +715,34 @@ export default class GameScene extends Phaser.Scene {
     sound.stopMusic();
     sound.win();
 
-    // boss drops the Sturdy Axle, which unlocks the Wooden Wagon
-    let bonus = 0;
-    if (beatBoss) {
-      bonus = 12;
-      Player.state.scrap += bonus;
-      Player.unlockPart('axle');
-    }
+    const reward = this.levelCfg.reward;
+    const isFinal = this.levelId >= LAST_LEVEL;
+
+    // boss drops a part that unlocks the next car body
+    Player.state.scrap += 12;
+    if (reward) Player.unlockPart(reward.part);
 
     const cx = GAME_WIDTH / 2;
     const cy = GAME_HEIGHT / 2;
-    this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x1b1d2a, 0.45).setDepth(30);
-    this.bannerText(cx, cy - 70, beatBoss ? 'YOU BEAT BIG CHIEF GLOOP!' : 'LEVEL COMPLETE!', '#ffe14d', 40);
-    if (beatBoss) {
-      this.add.image(cx, cy, 'axle').setScale(1.6).setDepth(32);
-      this.bannerText(cx, cy + 36, 'Sturdy Axle unlocked — build the Wooden Wagon!', '#9fe6a0', 18);
+    this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x1b1d2a, 0.5).setDepth(30);
+
+    if (isFinal) {
+      this.bannerText(cx, cy - 80, '🏆  YOU SAVED THE LAND!  🏆', '#ffe14d', 38);
+      this.bannerText(cx, cy - 30, `You beat ${this.bossSpec.name} and every goblin horde!`, '#ffffff', 20);
+      this.bannerText(cx, cy + 16, 'CHAMPION', '#9fe6a0', 30);
+    } else {
+      this.bannerText(cx, cy - 78, `YOU BEAT ${this.bossSpec.name.toUpperCase()}!`, '#ffe14d', 36);
+      if (reward) {
+        this.add.image(cx, cy, 'axle').setScale(1.5).setDepth(32);
+        this.bannerText(cx, cy + 38, `New part unlocked — build the ${reward.body}!`, '#9fe6a0', 18);
+      }
     }
-    this.bannerText(cx, cy + 78, 'Rolling into the Garage…', '#ffffff', 20);
-    for (let i = 0; i < 30; i++) this.time.delayedCall(i * 22, () => this.confettiBit(cx, cy - 150));
+    this.bannerText(cx, cy + 80, 'Rolling into the Garage…', '#ffffff', 20);
+    for (let i = 0; i < 36; i++) this.time.delayedCall(i * 20, () => this.confettiBit(cx, cy - 150));
 
     const earned = Player.state.scrap - this.levelStartScrap;
     Player.save();
-    this.time.delayedCall(2200, () => this.scene.start('Garage', { earned }));
+    this.time.delayedCall(2400, () => this.scene.start('Garage', { earned }));
   }
 
   freezeEnemies() {

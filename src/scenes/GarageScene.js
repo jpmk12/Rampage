@@ -133,9 +133,10 @@ export default class GarageScene extends Phaser.Scene {
     this.cards.forEach((c) => c.destroy());
     this.cards = [];
 
-    const xs = [150, 315, 480];
-    BODIES.forEach((item, i) => this.cards.push(this.makeCard(xs[i], 320, 'body', item)));
-    WEAPONS.forEach((item, i) => this.cards.push(this.makeCard(xs[i], 446, 'weapon', item)));
+    const startX = 104;
+    const step = 120;
+    BODIES.forEach((item, i) => this.cards.push(this.makeCard(startX + i * step, 320, 'body', item)));
+    WEAPONS.forEach((item, i) => this.cards.push(this.makeCard(startX + i * step, 446, 'weapon', item)));
   }
 
   makeCard(x, y, kind, item) {
@@ -175,25 +176,26 @@ export default class GarageScene extends Phaser.Scene {
     }
 
     const container = this.add.container(x, y);
-    const bg = this.add.rectangle(0, 0, 150, 100, fill, 1).setStrokeStyle(3, border);
+    const bg = this.add.rectangle(0, 0, 112, 100, fill, 1).setStrokeStyle(3, border);
     bg.setInteractive({ useHandCursor: true });
 
     const iconKey = kind === 'body' ? `body-${item.id}` : `wpn-${item.id}`;
-    const icon = this.add.image(0, -22, iconKey).setScale(kind === 'body' ? 0.6 : 1.4);
+    const icon = this.add.image(0, -22, iconKey).setScale(kind === 'body' ? 0.5 : 1.2);
 
     const name = this.add
-      .text(0, 20, item.name, {
+      .text(0, 18, item.name, {
         fontFamily: 'system-ui, sans-serif',
-        fontSize: '13px',
+        fontSize: '12px',
         color: UI.text,
         align: 'center',
+        wordWrap: { width: 108 },
       })
       .setOrigin(0.5);
 
     const statusText = this.add
-      .text(0, 38, status, {
+      .text(0, 40, status, {
         fontFamily: 'system-ui, sans-serif',
-        fontSize: '13px',
+        fontSize: '12px',
         color: statusColor,
         fontStyle: 'bold',
       })

@@ -24,6 +24,23 @@ export const BODIES = [
     price: 20,
     health: 8,
     mount: { x: 46, y: -56 },
+    requiresPart: 'engine', // beat Mayor Moldy (Level 2)
+  },
+  {
+    id: 'armored',
+    name: 'Armored Truck',
+    price: 36,
+    health: 12,
+    mount: { x: 48, y: -58 },
+    requiresPart: 'plate', // beat Sheriff Snaketail (Level 3)
+  },
+  {
+    id: 'tank',
+    name: 'Battle Tank',
+    price: 60,
+    health: 18,
+    mount: { x: 52, y: -60 },
+    requiresPart: 'reactor', // beat Frost King Yeti (Level 4)
   },
 ];
 
@@ -60,6 +77,28 @@ export const WEAPONS = [
     shot: 'shot-catapult',
     shotScale: 1.3,
     len: 34,
+  },
+  {
+    id: 'cannon',
+    name: 'Cannon',
+    price: 26,
+    cooldown: 300,
+    speed: 840,
+    damage: 3,
+    shot: 'shot-cannon',
+    shotScale: 1.1,
+    len: 34,
+  },
+  {
+    id: 'rocket',
+    name: 'Rocket',
+    price: 44,
+    cooldown: 480,
+    speed: 720,
+    damage: 5,
+    shot: 'shot-rocket',
+    shotScale: 1.2,
+    len: 36,
   },
 ];
 
