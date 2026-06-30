@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT } from '../config.js';
+import { GAME_WIDTH, GAME_HEIGHT, FONTS } from '../config.js';
 import { Player } from '../state/PlayerState.js';
 import { BODIES, WEAPONS } from '../data/catalog.js';
 import { buildCar } from '../entities/Car.js';
@@ -45,16 +45,16 @@ export default class GarageScene extends Phaser.Scene {
   }
 
   buildHeader() {
-    this.add.text(24, 12, '🔧 GARAGE', {
-      fontFamily: 'system-ui, sans-serif',
-      fontSize: '30px',
+    this.add.text(24, 10, '🔧 GARAGE', {
+      fontFamily: FONTS.display,
+      fontSize: '34px',
       color: '#ffe14d',
       stroke: '#000000',
       strokeThickness: 3,
     });
     if (this.earned > 0) {
       this.add.text(210, 22, `+${this.earned} scrap this level!`, {
-        fontFamily: 'system-ui, sans-serif',
+        fontFamily: FONTS.ui,
         fontSize: '16px',
         color: '#9fe6a0',
       });
@@ -63,7 +63,7 @@ export default class GarageScene extends Phaser.Scene {
     this.add.image(GAME_WIDTH - 150, 28, 'scrap').setScale(1.2);
     this.scrapText = this.add
       .text(GAME_WIDTH - 134, 12, String(Player.state.scrap), {
-        fontFamily: 'system-ui, sans-serif',
+        fontFamily: FONTS.ui,
         fontSize: '30px',
         color: '#ffffff',
         stroke: '#000000',
@@ -86,7 +86,7 @@ export default class GarageScene extends Phaser.Scene {
     g.fillTriangle(x - 6, y + h - 6, x + 16, y + h + 14, x + 16, y + h - 2);
     this.add
       .text(x - w + 14, y + 12, msg, {
-        fontFamily: 'system-ui, sans-serif',
+        fontFamily: FONTS.ui,
         fontSize: '15px',
         color: '#222222',
         align: 'left',
@@ -129,7 +129,7 @@ export default class GarageScene extends Phaser.Scene {
 
   shelfLabel(text, x, y) {
     this.add.text(x, y, text, {
-      fontFamily: 'system-ui, sans-serif',
+      fontFamily: FONTS.ui,
       fontSize: '18px',
       color: '#bfe6ff',
       stroke: '#000000',
@@ -192,7 +192,7 @@ export default class GarageScene extends Phaser.Scene {
 
     const name = this.add
       .text(0, 18, item.name, {
-        fontFamily: 'system-ui, sans-serif',
+        fontFamily: FONTS.ui,
         fontSize: '12px',
         color: UI.text,
         align: 'center',
@@ -202,7 +202,7 @@ export default class GarageScene extends Phaser.Scene {
 
     const statusText = this.add
       .text(0, 40, status, {
-        fontFamily: 'system-ui, sans-serif',
+        fontFamily: FONTS.ui,
         fontSize: '12px',
         color: statusColor,
         fontStyle: 'bold',
@@ -283,7 +283,7 @@ export default class GarageScene extends Phaser.Scene {
     bg.setInteractive({ useHandCursor: true });
     const label = this.add
       .text(0, 0, 'ROLL OUT! ▶', {
-        fontFamily: 'system-ui, sans-serif',
+        fontFamily: FONTS.ui,
         fontSize: '24px',
         color: '#ffffff',
         stroke: '#1b5524',

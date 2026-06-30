@@ -120,6 +120,14 @@ swamp spores, blowing sand, falling snow, rising embers), a sun/moon and
 drifting clouds, wheel dust, muzzle flashes, a damage flash, and smooth scene
 fades.
 
+**Real display fonts (done):** the title, HUD, buttons, and banners now use
+chunky comic-book fonts (**Bangers** for headlines, **Luckiest Guy** for UI)
+instead of the system font — a big step toward a finished, "real game" look.
+The car also casts a contact shadow that shrinks as it jumps. This is the first
+real third-party *asset* in the project (see Credits); the same approach
+(loading files under the existing texture keys) is how sprite art gets added
+next, per [docs/ART_UPGRADE.md](./docs/ART_UPGRADE.md).
+
 **Kid Mode (done):** an invincible mode for young players, toggled on the title
 screen. The car can still be bumped (it flashes and gets briefly stunned) but
 never loses hearts and there's no Game Over — so little kids can just drive,
@@ -134,3 +142,12 @@ next steps: a cosmetic sticker shop.
 - [Phaser 3](https://phaser.io/) — HTML5 2D game framework
 - [Vite](https://vitejs.dev/) — dev server & bundler
 - Plain JavaScript (ES modules)
+
+## Credits
+
+All sprites and sound are still generated in code. The only bundled assets are
+the display fonts, used under their open licenses (license texts are in
+`public/fonts/`):
+
+- **Bangers** by Vernon Adams / Google Fonts — SIL Open Font License 1.1
+- **Luckiest Guy** by Astigmatic / Google Fonts — Apache License 2.0

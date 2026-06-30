@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT } from '../config.js';
+import { GAME_WIDTH, GAME_HEIGHT, FONTS } from '../config.js';
 
 // Overlay launched on top of a paused GameScene. Resume / Restart / Menu.
 export default class PauseScene extends Phaser.Scene {
@@ -17,9 +17,8 @@ export default class PauseScene extends Phaser.Scene {
 
     this.add
       .text(cx, cy - 104, '⏸  PAUSED', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '38px',
-        fontStyle: 'bold',
+        fontFamily: FONTS.display,
+        fontSize: '46px',
         color: '#ffe14d',
         stroke: '#1b1d2a',
         strokeThickness: 5,
@@ -55,7 +54,7 @@ export default class PauseScene extends Phaser.Scene {
     bg.setInteractive({ useHandCursor: true });
     const txt = this.add
       .text(0, 0, label, {
-        fontFamily: 'system-ui, sans-serif',
+        fontFamily: FONTS.ui,
         fontSize: '22px',
         fontStyle: 'bold',
         color: '#ffffff',

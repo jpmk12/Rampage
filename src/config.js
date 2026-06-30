@@ -3,6 +3,13 @@
 export const GAME_WIDTH = 960;
 export const GAME_HEIGHT = 540;
 
+// Display fonts (loaded in index.html / main.js). Fall back to system-ui if a
+// font hasn't loaded yet.
+export const FONTS = {
+  display: "'Bangers', system-ui, sans-serif", // titles, banners
+  ui: "'Luckiest Guy', system-ui, sans-serif", // HUD, buttons, labels
+};
+
 // Where the ground band starts (top edge of the dirt).
 export const GROUND_TOP_Y = GAME_HEIGHT - 90;
 

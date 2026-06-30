@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, GROUND_TOP_Y, SCROLL } from '../config.js';
+import { GAME_WIDTH, GAME_HEIGHT, GROUND_TOP_Y, SCROLL, FONTS } from '../config.js';
 import { Player } from '../state/PlayerState.js';
 import { buildCar } from '../entities/Car.js';
 import { sound } from '../audio/Sound.js';
@@ -56,9 +56,8 @@ export default class TitleScene extends Phaser.Scene {
   buildTitle() {
     this.add
       .text(GAME_WIDTH / 2, 150, 'RAMPAGE', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '92px',
-        fontStyle: 'bold',
+        fontFamily: FONTS.display,
+        fontSize: '120px',
         color: '#ffe14d',
         stroke: '#1b1d2a',
         strokeThickness: 12,
@@ -67,7 +66,7 @@ export default class TitleScene extends Phaser.Scene {
       .setShadow(0, 6, '#00000055', 8);
     this.add
       .text(GAME_WIDTH / 2, 214, 'Build your battle car!', {
-        fontFamily: 'system-ui, sans-serif',
+        fontFamily: FONTS.ui,
         fontSize: '24px',
         color: '#ffffff',
         stroke: '#1b1d2a',
@@ -98,7 +97,7 @@ export default class TitleScene extends Phaser.Scene {
 
     this.add
       .text(GAME_WIDTH / 2, GAME_HEIGHT - 28, 'Aim: ↑/↓ or drag • Jump: Space or tap • Pause: Esc', {
-        fontFamily: 'system-ui, sans-serif',
+        fontFamily: FONTS.ui,
         fontSize: '15px',
         color: '#ffffff',
       })
@@ -116,7 +115,7 @@ export default class TitleScene extends Phaser.Scene {
     bg.setInteractive({ useHandCursor: true });
     const txt = this.add
       .text(0, 0, label, {
-        fontFamily: 'system-ui, sans-serif',
+        fontFamily: FONTS.ui,
         fontSize: '30px',
         fontStyle: 'bold',
         color: '#ffffff',
@@ -135,7 +134,7 @@ export default class TitleScene extends Phaser.Scene {
   smallButton(x, y, label, onClick) {
     const t = this.add
       .text(x, y, label, {
-        fontFamily: 'system-ui, sans-serif',
+        fontFamily: FONTS.ui,
         fontSize: '18px',
         color: '#bfe6ff',
         stroke: '#1b1d2a',

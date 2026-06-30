@@ -12,6 +12,7 @@ import {
   SCRAP,
   LEVEL,
   COLORS,
+  FONTS,
 } from '../config.js';
 import { Player } from '../state/PlayerState.js';
 import { getBody, getWeapon } from '../data/catalog.js';
@@ -208,6 +209,9 @@ export default class GameScene extends Phaser.Scene {
   }
 
   buildCar(profile) {
+    this.carShadow = this.add
+      .ellipse(CAR.x, CAR.groundY + 4, 96, 22, 0x000000, 0.22)
+      .setDepth(4);
     this.car = buildCar(this, CAR.x, CAR.groundY, profile.body, profile.weapon, profile.turrets);
     this.car.setDepth(5);
     this.weaponSprite = this.car.getData('weaponSprite');
@@ -265,7 +269,7 @@ export default class GameScene extends Phaser.Scene {
 
   buildHud() {
     const style = {
-      fontFamily: 'system-ui, sans-serif',
+      fontFamily: FONTS.ui,
       fontSize: '20px',
       color: '#ffffff',
       stroke: '#1b1d2a',
@@ -290,7 +294,7 @@ export default class GameScene extends Phaser.Scene {
     if (Player.state.littleKid) {
       this.add
         .text(28 + this.maxHealth * 30, 72, '👶 KID MODE', {
-          fontFamily: 'system-ui, sans-serif',
+          fontFamily: FONTS.ui,
           fontSize: '16px',
           color: '#9fe6a0',
           stroke: '#1b1d2a',
@@ -312,7 +316,7 @@ export default class GameScene extends Phaser.Scene {
     this.add.image(GAME_WIDTH / 2 + 132, 24, 'flag').setScale(0.18).setDepth(20);
 
     // subtle touch hints
-    const hint = { fontFamily: 'system-ui, sans-serif', fontSize: '13px', color: '#ffffff' };
+    const hint = { fontFamily: FONTS.ui, fontSize: '13px', color: '#ffffff' };
     this.add.text(20, GAME_HEIGHT - 26, '⤒ tap = jump', hint).setAlpha(0.35).setDepth(20);
     this.add
       .text(GAME_WIDTH - 130, GAME_HEIGHT - 26, 'drag = aim ⇅', hint)
@@ -489,6 +493,11 @@ export default class GameScene extends Phaser.Scene {
     }
     // tilt slightly while airborne for juice
     this.car.rotation = Phaser.Math.Clamp(this.carVY * 0.06, -0.14, 0.14);
+
+    // shadow shrinks/fades as the car rises
+    const air = CAR.groundY - this.car.y;
+    const f = Phaser.Math.Clamp(1 - air / 170, 0.4, 1);
+    this.carShadow.setScale(f, f).setAlpha(0.22 * f);
   }
 
   updateAim(delta) {
@@ -1134,7 +1143,7 @@ export default class GameScene extends Phaser.Scene {
   bannerText(x, y, msg, color, size) {
     return this.add
       .text(x, y, msg, {
-        fontFamily: 'system-ui, sans-serif',
+        fontFamily: FONTS.display,
         fontSize: `${size}px`,
         color,
         stroke: '#1b1d2a',
