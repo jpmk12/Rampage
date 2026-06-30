@@ -114,8 +114,10 @@ boss rolls the victory/Champion ending. It's a complete game — all art and
 audio still generated in code, no binary assets.
 
 **Polish & shell (done):** a **title screen** (your current car idling on an
-animated landscape with a PLAY button), a **pause menu** (⏸ button or Esc/P →
-Resume / Restart Level / Main Menu), per-biome **ambient weather** (pollen,
+animated landscape) with **PLAY**, **⚡ Freestyle**, a **Kid Mode** toggle, and —
+when applicable — **New Game** and **🔄 Reset Freestyle arsenal**; a **pause
+menu** (⏸ button or Esc/P → Resume / Restart Level / Main Menu), per-biome
+**ambient weather** (pollen,
 swamp spores, blowing sand, falling snow, rising embers), a sun/moon and
 drifting clouds, wheel dust, muzzle flashes, a damage flash, and smooth scene
 fades.
@@ -123,10 +125,19 @@ fades.
 **Freestyle bonus round (done):** an action sandbox for the power-up crowd,
 launched from the title screen. Endless escalating waves; defeated enemies drop
 weapon and boost pickups (**+gun, +spread, +rocket, +missile, +bomb, +fire
-rate, +power, +heart**) that stack onto your tank. By the end you're a rolling
-gun-tower firing a wall of bolts, rockets, homing missiles, and lobbed bombs.
-Your **arsenal is saved and persists across replays** (Replay keeps it, or Start
-Fresh resets), so you just keep getting more powerful. Score + best are tracked.
+rate, +power, +heart**) that stack onto your tank, which grows into a rolling
+gun-tower firing bolts, rockets, homing missiles, and lobbed bombs.
+
+The arsenal is **capped so it never floods the screen**: each weapon fires up to
+a fixed number of projectiles (guns 6, spread 5, rockets 4, missiles 3, bombs 2)
+and fire-rate has a ceiling. Pickups collected past a cap don't add more
+bullets — they **level up that weapon** (each shot hits harder and a little
+bigger), shown as a **★N** badge in the HUD. As you grow more powerful, the
+waves get denser and **rotating bosses** roll in on a score cadence, scaling in
+toughness and dropping bigger loot. Your **arsenal is saved and persists across
+replays** (Replay keeps it; Start Fresh, or **🔄 Reset Freestyle arsenal** on
+the title screen, wipes it back to starter while keeping your best score). Score
+and best are tracked.
 
 **Real display fonts (done):** the title, HUD, buttons, and banners now use
 chunky comic-book fonts (**Bangers** for headlines, **Luckiest Guy** for UI)
