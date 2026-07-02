@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT } from './config.js';
 import { Player } from './state/PlayerState.js';
 import { sound } from './audio/Sound.js';
+import { assetKeys } from './data/assetManifest.js';
+import { ASSET_OVERRIDES } from './data/assets.js';
 import BootScene from './scenes/BootScene.js';
 import TitleScene from './scenes/TitleScene.js';
 import GameScene from './scenes/GameScene.js';
@@ -68,6 +70,24 @@ async function boot() {
   // Expose for quick debugging / automated smoke tests in the browser console.
   window.__PHASER_GAME__ = game;
   window.__PLAYER__ = Player;
+
+  // Art-pipeline audit: run `__ASSETS__()` (or `console.table(__ASSETS__())`) in
+  // the browser console to see every replaceable sprite, its expected vs actual
+  // size, and whether a custom PNG is in use. Filter custom ones with
+  // `__ASSETS__().filter(a => a.custom)`.
+  const overridden = new Set(Object.keys(ASSET_OVERRIDES));
+  window.__ASSETS__ = () =>
+    assetKeys().map((a) => {
+      const has = game.textures.exists(a.key);
+      const img = has ? game.textures.get(a.key).getSourceImage() : null;
+      return {
+        key: a.key,
+        group: a.group,
+        expected: `${a.w}x${a.h}`,
+        actual: img ? `${img.width}x${img.height}` : '—',
+        custom: overridden.has(a.key),
+      };
+    });
 }
 
 boot();

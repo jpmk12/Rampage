@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT } from '../config.js';
 import { LEVELS } from '../data/levels.js';
 import { ASSET_OVERRIDES } from '../data/assets.js';
+import { specByKey } from '../data/assetManifest.js';
 
 // BootScene generates placeholder art as in-code textures. Any real sprite
 // registered in data/assets.js is loaded first and used instead — the make*
@@ -16,10 +17,28 @@ export default class BootScene extends Phaser.Scene {
   preload() {
     const keys = Object.keys(ASSET_OVERRIDES);
     if (!keys.length) return;
+    const spec = specByKey();
     this.load.setPath('assets/sprites');
     this.load.on('loaderror', (file) =>
       console.warn('[Rampage] asset override failed to load, using placeholder:', file.key)
     );
+    // On success, sanity-check the dropped-in art against the manifest so an
+    // artist gets a clear heads-up if a sprite is an unexpected key or size.
+    this.load.on('filecomplete', (key, type) => {
+      if (type !== 'image') return;
+      const s = spec[key];
+      if (!s) {
+        console.warn(`[Rampage] override "${key}" isn't a known texture key — see docs/ASSETS.md`);
+        return;
+      }
+      const img = this.textures.get(key).getSourceImage();
+      if (img && (img.width !== s.w || img.height !== s.h)) {
+        console.warn(
+          `[Rampage] "${key}" is ${img.width}x${img.height}; expected ${s.w}x${s.h}. ` +
+            'It will still work but may sit off-position — resize to match, anchor: ' + s.anchor + '.'
+        );
+      }
+    });
     for (const key of keys) this.load.image(key, ASSET_OVERRIDES[key]);
   }
 

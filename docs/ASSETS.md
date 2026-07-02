@@ -25,24 +25,51 @@ sprite and the game picks it up automatically — no gameplay code changes.
 
 ## The art list (keys, sizes, what it is)
 
-| Key(s) | Size (px) | What it is |
-|--------|-----------|------------|
-| `body-cardboard`, `body-wood`, `body-iron`, `body-armored`, `body-tank` | 124×92 | the 5 car bodies (wheels on bottom, facing right) |
-| `runner-1`…`runner-5` | ~64×66 | small charging enemy, recolored per biome |
-| `brute-1`…`brute-5` | ~96×96 | big tanky enemy |
-| `lobber-1`…`lobber-5` | ~62×74 | enemy that throws |
-| `flyer-1`…`flyer-5` | ~74×52 | winged enemy |
-| `drummer`, `gloop`, `boss-moldy`, `boss-snaketail`, `boss-yeti`, `boss-krang` | ~150×140 | the bosses |
-| `sky-1`…`sky-5` | 960×540 | full-screen biome sky |
-| `hills-far-1`…`-5`, `hills-near-1`…`-5` | 360×150 / 300×210 | parallax hills (should tile horizontally) |
-| `ground-1`…`ground-5` | 256×90 | road strip (tiles horizontally) |
-| `wpn-bow/crossbow/catapult/cannon/rocket` | ~40×32 | weapon on the car (mounts by its left-center) |
-| `shot-bow/crossbow/catapult/cannon/rocket` | small | projectiles |
-| `scrap` 26×26 · `heart`/`heart-empty` 30×30 · `flag` 76×190 · `cloud` · `sun` · `turret` · `bolt` (garage dog) · `axle` | — | pickups / UI / fx |
+The **authoritative list lives in `src/data/assetManifest.js`** (97 keys). A
+generated snapshot is in [`asset-manifest.json`](./asset-manifest.json), and you
+can print a checklist any time with `node scripts/asset-manifest.mjs`. Summary:
 
-The 1–5 suffix is the biome: 1 Greenwood, 2 Zombie Flats, 3 Bandit Badlands,
+| Key(s) | Size (px) | Anchor | What it is |
+|--------|-----------|--------|------------|
+| `body-cardboard/wood/iron/armored/tank` | 124×92 | bottom | the 5 car bodies (wheels on bottom, face **right**) |
+| `wpn-bow/crossbow/catapult/cannon/rocket` | ~40×32 | left-center | weapon on the car (pivots at its left edge) |
+| `shot-bow/crossbow/catapult/cannon/rocket` | 18–28 wide | center | player projectiles |
+| `runner-1…5` | 64×66 | bottom | small quick enemy — **also the Charger & split Runts** |
+| `brute-1…5` | 96×96 | bottom | big tanky enemy — **also the Shield enemy, mega & minis 2–5** |
+| `lobber-1…5` | 62×74 | bottom | throws rocks — **also the Splitter** |
+| `flyer-1…5` | 74×52 | center | winged flyer — **also the Diver** |
+| `drummer` 96×104 · `gloop` 168×132 · `boss-moldy` 150×150 · `boss-snaketail` 160×140 · `boss-yeti` 150×140 · `boss-krang` 160×140 | — | bottom | the bosses (face **left**) |
+| `sky-1…5` | 960×540 | top-left | full-screen biome sky |
+| `mtns-1…5` | 480×200 | top-left · **tiles** | distant hazy mountains (furthest layer) |
+| `hills-far-1…5` / `hills-near-1…5` | 360×150 / 300×210 | top-left · **tiles** | parallax hills |
+| `ground-1…5` | 256×90 | top-left · **tiles** | road/ground strip |
+| `prop-1…5` | 64×96 | bottom | scenery that rolls past (tree/dead tree/cactus/pine/rock) |
+| `proj-1…5` 30×30 · `cabbage` 32×32 · `enemy-rock` 22×22 · `hazard-1…5` 76×56 | — | center/bottom | enemy projectiles & (unused) hazard art |
+| `scrap` 26×26 · `heart`/`heart-empty` 30×30 · `crate`\* 30×30 · `flag` 76×190 · `axle` 56×32 | — | center/bottom | pickups & UI |
+| `turret` 52×30 · `wheel-spin`\*\* 36×36 · `shield-plate`\* 26×54 · `bolt` 86×76 | — | — | roof turret · spinning wheel · shield plate · garage dog |
+| `cloud`\* 150×64 · `sun`\* 150×150 · `puff`\* 24×24 · `flake`\* 10×10 | — | center | sky & particle FX |
+
+\* **Tinted in code** (recoloured per biome/pickup) — supply a **white/greyscale**
+image so the tint still reads. \*\* `wheel-spin` **rotates**, so keep it round and
+centered.
+
+The **1–5 suffix is the biome:** 1 Greenwood, 2 Zombie Flats, 3 Bandit Badlands,
 4 Frostbite Peaks, 5 Volcano Fortress. You can reuse one image across biomes
-(e.g. one goblin for all `runner-N`) or make each unique.
+(e.g. one goblin for all `runner-N`) or make each unique. Because the new enemy
+**behaviours reuse existing art** (charger=runner, shield=brute, splitter=lobber,
+diver=flyer), you do **not** need separate sprites for them.
+
+## Pipeline tools
+
+- **`src/data/assetManifest.js`** — the source of truth (key, size, anchor,
+  facing, tiling, tinted, description). Edit here if art specs change.
+- **`node scripts/asset-manifest.mjs`** — regenerates `docs/asset-manifest.json`
+  and prints a per-group checklist.
+- **Size check** — when you drop a PNG in and register it, the loader logs a
+  console warning if the file is an unknown key or the wrong size.
+- **`__ASSETS__()`** — run in the browser console to audit every sprite: expected
+  vs actual size and whether a custom file is in use
+  (`console.table(__ASSETS__())`, or `__ASSETS__().filter(a => a.custom)`).
 
 ## Where to get matching art (free)
 

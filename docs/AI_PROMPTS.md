@@ -83,6 +83,11 @@ shadow
 
 ## 2) Enemies  (face LEFT, full body standing/flying, one per biome × 4 roles)
 
+> You only need these **4 sprites per biome**. The game's signature behaviours
+> reuse them — the **Charger** is a runner, the **Shield** enemy is a brute (it
+> just carries the separate `shield-plate` sprite), the **Splitter** is a lobber,
+> and the **Diver** is a flyer — so there's no extra art to make.
+
 Keep the **same 4 body shapes across all biomes**, just re-skin the creature so
 each world feels different. Roles:
 - **runner** = small, quick, holding a little club.
@@ -141,22 +146,31 @@ bodies, glowing red eyes.
 
 ## 4) Backgrounds  (no characters; landscape/scenery only)
 
-For each biome (N = 1..5), generate three layers. Hills and ground must
-**tile seamlessly left-to-right** (ask for "seamless horizontally tileable,
-edges match"). I can help fix any seams.
+For each biome (N = 1..5), generate the layers below. **Mountains, hills, and
+ground must tile seamlessly left-to-right** (ask for "seamless horizontally
+tileable, edges match"). I can help fix any seams.
 
-- **`sky-N`** — a simple flat cartoon gradient sky, no characters, 16:9.
+- **`sky-N`** (960×540) — a simple flat cartoon gradient sky, no characters, 16:9.
   - 1 bright blue sunny day · 2 purple dusk with a pale moon · 3 warm
     orange desert sky · 4 pale icy blue sky · 5 dark smoky red volcano sky.
-- **`hills-far-N`** / **`hills-near-N`** — a seamless, horizontally tileable
-  layer of rounded rolling hills (silhouette), flat cartoon colors, side-
-  scroller parallax background, transparent or sky-matching top.
+- **`mtns-N`** (480×200, tileable) — a **distant hazy mountain range**
+  silhouette, pale/desaturated (atmospheric haze), for the furthest parallax
+  layer, transparent above the peaks.
+  - 1 hazy green hills far off · 2 murky distant peaks · 3 pale mesa buttes ·
+    4 snow-capped mountains · 5 dark smoking volcano peaks.
+- **`hills-far-N`** (360×150) / **`hills-near-N`** (300×210) — seamless,
+  horizontally tileable rounded rolling hills (silhouette), flat cartoon colors,
+  side-scroller parallax, transparent or sky-matching top.
   - 1 green grassy hills · 2 murky swamp mounds · 3 sandy desert dunes ·
     4 snowy hills · 5 dark charred volcanic mountains.
-- **`ground-N`** — a seamless, horizontally tileable ground strip with a road,
-  top-edge visible, flat cartoon colors.
+- **`ground-N`** (256×90, tileable) — a ground strip with a road, top-edge
+  visible, flat cartoon colors.
   - 1 dirt road with grass edge · 2 swamp mud · 3 desert sand track ·
     4 snowy road · 5 cracked dark lava-rock road.
+- **`prop-N`** (64×96, **standing on the bottom edge**) — a single foreground
+  scenery prop that rolls past on the ground, transparent background.
+  - 1 leafy round green tree · 2 bare spooky dead tree · 3 tall green cactus ·
+    4 snowy pine tree · 5 jagged dark volcanic rock with a lava glow.
 
 ## 5) Pickups, UI & FX  (small, clean, transparent)
 
@@ -166,13 +180,23 @@ edges match"). I can help fix any seams.
   heart as an empty dark-grey outline.
 - **`flag`** — a black-and-white checkered finish flag on a tall pole, planted in
   a little mound at the base.
-- **`turret`** — a small chunky cartoon gun turret (a domed base with a short
-  barrel pointing right) designed to bolt onto a car roof, side view.
+- **`turret`** — a small chunky cartoon gun turret with a **flat top and bottom**
+  (a boxy armored block with a short barrel pointing right) so copies **stack
+  vertically** into a tower; designed to bolt onto a car roof, side view.
+- **`wheel-spin`** — a single **round** cartoon wheel/tyre seen head-on (dark tyre,
+  light rim, a few spokes, small hub), perfectly centered — **it spins in-game**,
+  so keep it circular and centered. Neutral grey works on every car.
+- **`shield-plate`** — a tall rounded metal shield/riot plate seen from the side
+  (a vertical bulwark an enemy holds up front). Draw it **white/light grey** — the
+  game tints it to each biome.
 - **`bolt`** — a cute friendly little robot dog mascot (the garage mechanic),
   warm yellow metal, antenna ear, screen eyes, side view.
-- **`cloud`** — a single fluffy flat cartoon cloud. **`sun`** — a simple soft
-  round cartoon sun with a gentle glow.
-- **`cabbage`** — a round leafy green cabbage (boss throws these).
+- **`cloud`** — a single fluffy flat cartoon cloud (**white** — tinted in game).
+  **`sun`** — a simple soft round cartoon sun with a gentle glow (**white**).
+- **`crate`** — a small wooden/metal supply crate with a big star on it, a
+  power-up box (draw it **white** — the game tints it per power-up).
+- **`cabbage`** — a round leafy green cabbage (boss throws these). **`proj-2…5`**
+  — a simple round energy ball / thrown blob, one per biome (tinted in game).
 
 ---
 
@@ -200,3 +224,9 @@ edges match"). I can help fix any seams.
    `boss-krang.png`) and put it in `public/assets/sprites/`.
 5. **Register** it in `src/data/assets.js` (uncomment its line), or just send me
    the filenames and I'll wire and fine-tune them.
+6. **Verify:** reload and open the browser console — the game **warns** if a file
+   is the wrong size or an unknown key. Run `console.table(__ASSETS__())` to see
+   every sprite's expected vs actual size and which ones are now custom.
+
+> Exact sizes/anchors for every key: [ASSETS.md](./ASSETS.md) ·
+> [asset-manifest.json](./asset-manifest.json) · or `node scripts/asset-manifest.mjs`.
