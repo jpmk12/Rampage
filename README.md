@@ -129,6 +129,12 @@ audio still generated in code, no binary assets.
 - **Kill combos:** chain defeats to build a **x2–x5 multiplier** (more score in
   Freestyle, more loot in the campaign). A hit breaks the streak — so there's a
   reason to play cleanly.
+- **Bosses that actually fight:** each boss now cycles **telegraphed attacks**
+  (lob, fan spread, minion summon, and a rain-down barrage), **enrages at half
+  health** (faster, nastier patterns), and glows during a wind-up — hit it in
+  that window for a **double-damage crit**. Mini-bosses summon in waves.
+- **Animation:** cars roll on **spinning spoked wheels**, ground enemies waddle
+  with a hop-and-squash walk, and flyers flap their wings.
 
 **Polish & shell (done):** a **title screen** (your current car idling on an
 animated landscape) with **PLAY**, **⚡ Freestyle**, a **Kid Mode** toggle, and —

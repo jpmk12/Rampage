@@ -54,6 +54,7 @@ export default class BootScene extends Phaser.Scene {
     this.makeBolt('bolt');
     this.makeAxle('axle');
     this.makeTurret('turret');
+    this.makeWheelSpin('wheel-spin');
     this.makeShieldPlate('shield-plate');
     this.makeCloud('cloud');
     this.makeSun('sun');
@@ -689,6 +690,34 @@ export default class BootScene extends Phaser.Scene {
     g.fillStyle(0x55606b, 1);
     g.fillRoundedRect(46, 7, 5, 14, 2);
     g.generateTexture(key, W, H);
+    g.destroy();
+  }
+
+  // A spoked wheel that overlays each baked wheel and rotates for a sense of
+  // rolling. Reference radius 18 (36x36); the car scales it per wheel size.
+  makeWheelSpin(key) {
+    if (this.textures.exists(key)) return;
+    const R = 18;
+    const g = this.add.graphics();
+    // tire
+    g.fillStyle(0x2b2b33, 1);
+    g.fillCircle(R, R, R);
+    // rim
+    g.fillStyle(0x4a4f57, 1);
+    g.fillCircle(R, R, R * 0.74);
+    // spokes (so rotation reads)
+    g.lineStyle(3, 0xced2da, 1);
+    for (let i = 0; i < 4; i++) {
+      const a = (i * Math.PI) / 4;
+      g.beginPath();
+      g.moveTo(R + Math.cos(a) * R * 0.7, R + Math.sin(a) * R * 0.7);
+      g.lineTo(R - Math.cos(a) * R * 0.7, R - Math.sin(a) * R * 0.7);
+      g.strokePath();
+    }
+    // hub
+    g.fillStyle(0x6b6f78, 1);
+    g.fillCircle(R, R, R * 0.28);
+    g.generateTexture(key, R * 2, R * 2);
     g.destroy();
   }
 

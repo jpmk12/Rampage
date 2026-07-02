@@ -21,12 +21,23 @@ export function buildCar(scene, x, y, bodyId, weaponId, turrets = 0) {
   const container = scene.add.container(x, y);
 
   const bodySprite = scene.add.image(0, 0, `body-${body.id}`).setOrigin(0.5, 1);
+  container.add(bodySprite);
+
+  // spinning wheels overlaid on top of the baked wheels (rotated by the scene)
+  const wheels = [];
+  (body.wheels || []).forEach((w) => {
+    const ws = scene.add.image(w.x, w.y, 'wheel-spin').setOrigin(0.5).setScale(w.r / 18);
+    container.add(ws);
+    wheels.push(ws);
+  });
+
   const weaponSprite = scene.add
     .image(body.mount.x, body.mount.y, `wpn-${weapon.id}`)
     .setOrigin(0, 0.5);
+  container.add(weaponSprite);
 
-  container.add([bodySprite, weaponSprite]);
   container.setData('weaponSprite', weaponSprite);
+  container.setData('wheels', wheels);
   container.setData('mount', body.mount);
   container.setData('weaponLen', weapon.len);
   container.setData('muzzle', { x: body.mount.x + weapon.len, y: body.mount.y });

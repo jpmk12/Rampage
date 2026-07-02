@@ -15,7 +15,7 @@ export const LEVELS = [
     projColor: 0x7cc24a,
     roster: { runner: 44, lobber: 20, flyer: 16, brute: 10, splitter: 12 },
     mini: { tex: 'drummer', name: 'Goblin Drummer', hp: 12 },
-    boss: { tex: 'gloop', name: 'Big Chief Gloop', hp: 34, projTex: 'cabbage' },
+    boss: { tex: 'gloop', name: 'Big Chief Gloop', hp: 34, projTex: 'cabbage', attacks: ['lob', 'summon'], rage: ['spread'] },
     reward: { part: 'axle', body: 'Wooden Wagon' },
   },
   {
@@ -27,7 +27,7 @@ export const LEVELS = [
     projColor: 0x9acb6a,
     roster: { runner: 34, brute: 16, shield: 16, lobber: 16, flyer: 14 },
     mini: { tex: 'brute-2', name: 'Zombie Bruiser', hp: 16, scale: 1.4 },
-    boss: { tex: 'boss-moldy', name: 'Mayor Moldy', hp: 40, projTex: 'proj-2' },
+    boss: { tex: 'boss-moldy', name: 'Mayor Moldy', hp: 40, projTex: 'proj-2', attacks: ['lob', 'spread'], rage: ['barrage'] },
     reward: { part: 'engine', body: 'Iron Buggy' },
   },
   {
@@ -39,7 +39,7 @@ export const LEVELS = [
     projColor: 0xd14a3a,
     roster: { runner: 30, charger: 20, flyer: 18, lobber: 14, brute: 12 },
     mini: { tex: 'brute-3', name: 'Coyote Bandit', hp: 20, scale: 1.4 },
-    boss: { tex: 'boss-snaketail', name: 'Sheriff Snaketail', hp: 48, projTex: 'proj-3' },
+    boss: { tex: 'boss-snaketail', name: 'Sheriff Snaketail', hp: 48, projTex: 'proj-3', attacks: ['spread', 'summon'], rage: ['barrage'] },
     reward: { part: 'plate', body: 'Armored Truck' },
   },
   {
@@ -51,7 +51,7 @@ export const LEVELS = [
     projColor: 0x9fd0f0,
     roster: { runner: 28, flyer: 20, diver: 18, brute: 14, shield: 12 },
     mini: { tex: 'brute-4', name: 'Avalanche Yeti', hp: 24, scale: 1.5 },
-    boss: { tex: 'boss-yeti', name: 'Frost King Yeti', hp: 56, projTex: 'proj-4' },
+    boss: { tex: 'boss-yeti', name: 'Frost King Yeti', hp: 56, projTex: 'proj-4', attacks: ['lob', 'barrage'], rage: ['summon', 'spread'] },
     reward: { part: 'reactor', body: 'Battle Tank' },
   },
   {
@@ -63,7 +63,7 @@ export const LEVELS = [
     projColor: 0xff7a3a,
     roster: { brute: 20, charger: 18, shield: 16, lobber: 14, flyer: 14, splitter: 8 },
     mini: { tex: 'brute-5', name: 'Forge Golem', hp: 28, scale: 1.5 },
-    boss: { tex: 'boss-krang', name: 'King Krang', hp: 72, projTex: 'proj-5' },
+    boss: { tex: 'boss-krang', name: 'King Krang', hp: 72, projTex: 'proj-5', attacks: ['spread', 'summon', 'barrage'], rage: ['barrage', 'spread'] },
     reward: null, // final boss — victory!
   },
 ];

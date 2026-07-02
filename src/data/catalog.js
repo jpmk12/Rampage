@@ -9,6 +9,8 @@ export const BODIES = [
     health: 3,
     // where the weapon attaches, relative to the car's bottom-center origin
     mount: { x: 36, y: -44 },
+    // spinning-wheel overlays (container-space offsets; match the baked wheels)
+    wheels: [{ x: -26, y: -14, r: 15 }, { x: 30, y: -14, r: 15 }],
   },
   {
     id: 'wood',
@@ -17,6 +19,7 @@ export const BODIES = [
     health: 5,
     mount: { x: 42, y: -52 },
     requiresPart: 'axle', // earned by beating Big Chief Gloop (Level 1 boss)
+    wheels: [{ x: -26, y: -14, r: 17 }, { x: 32, y: -14, r: 17 }],
   },
   {
     id: 'iron',
@@ -25,6 +28,7 @@ export const BODIES = [
     health: 8,
     mount: { x: 46, y: -56 },
     requiresPart: 'engine', // beat Mayor Moldy (Level 2)
+    wheels: [{ x: -24, y: -14, r: 18 }, { x: 34, y: -14, r: 18 }],
   },
   {
     id: 'armored',
@@ -33,6 +37,7 @@ export const BODIES = [
     health: 12,
     mount: { x: 48, y: -58 },
     requiresPart: 'plate', // beat Sheriff Snaketail (Level 3)
+    wheels: [{ x: -24, y: -14, r: 18 }, { x: 34, y: -14, r: 18 }],
   },
   {
     id: 'tank',
@@ -41,6 +46,7 @@ export const BODIES = [
     health: 18,
     mount: { x: 52, y: -60 },
     requiresPart: 'reactor', // beat Frost King Yeti (Level 4)
+    wheels: [{ x: -42, y: -16, r: 9 }, { x: 42, y: -16, r: 9 }],
   },
 ];
 

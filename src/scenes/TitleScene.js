@@ -189,5 +189,7 @@ export default class TitleScene extends Phaser.Scene {
     this.nearHills.tilePositionX += SCROLL.nearHills * delta;
     this.ground.tilePositionX += SCROLL.ground * delta;
     this.car.rotation = Math.sin(time * 0.005) * 0.02;
+    const wheels = this.car.getData('wheels');
+    if (wheels) for (const w of wheels) w.rotation += 0.012 * delta;
   }
 }

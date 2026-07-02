@@ -22,8 +22,6 @@ import { getLevel, LAST_LEVEL } from '../data/levels.js';
 import { buildCar, muzzleFor, addTurret } from '../entities/Car.js';
 import { sound } from '../audio/Sound.js';
 
-const MINI_SUMMON_EVERY = 1900; // ms between mini-boss summons
-const BOSS_THROW_EVERY = 1600; // ms between boss projectile throws
 
 // Hazards you must jump over are disabled for now (per request).
 const HAZARDS_ENABLED = false;
@@ -635,6 +633,13 @@ export default class GameScene extends Phaser.Scene {
     const air = CAR.groundY - this.car.y;
     const f = Phaser.Math.Clamp(1 - air / 170, 0.4, 1);
     this.carShadow.setScale(f, f).setAlpha(0.22 * f);
+
+    // roll the wheels (faster on the ground, coasting in the air)
+    const wheels = this.car.getData('wheels');
+    if (wheels && wheels.length) {
+      const spin = (this.onGround ? 0.02 : 0.008) * delta;
+      for (const w of wheels) w.rotation += spin;
+    }
   }
 
   updateAim(delta) {
@@ -672,6 +677,7 @@ export default class GameScene extends Phaser.Scene {
     const e = this.goblins.create(x, y, `${type.tex || type.key}-${this.levelId}`);
     e.setOrigin(0.5, type.lane === 'air' ? 0.5 : 1);
     if (type.scale) e.setScale(type.scale);
+    e.setData('baseScale', type.scale || 1);
     e.body.setAllowGravity(false);
     e.setVelocityX(-type.speed);
     e.setData('type', type);
@@ -1070,6 +1076,7 @@ export default class GameScene extends Phaser.Scene {
       const type = e.getData('type');
       const t = this.time.now * 0.012 + e.getData('seed');
 
+      const bs = e.getData('baseScale') || 1;
       if (type.lane === 'air') {
         if (type.dives && this.state === 'playing' && e.x < this.car.x + 340) {
           // swoop toward the car's height
@@ -1079,8 +1086,16 @@ export default class GameScene extends Phaser.Scene {
         } else {
           e.y = e.getData('baseY') + Math.sin(t * 1.6) * 26;
         }
+        // wing flap (fast horizontal squash)
+        if (!type.mega) e.setScale(bs * (1 + Math.sin(t * 8) * 0.12), bs * (1 - Math.sin(t * 8) * 0.06));
       } else {
-        e.rotation = Math.sin(t * 1.5) * 0.08;
+        // a little walking waddle: hop + squash synced to the stride
+        const wob = Math.sin(t * 2.4);
+        e.rotation = wob * 0.09;
+        if (!type.mega) {
+          e.setScale(bs * (1 + wob * 0.05), bs * (1 - wob * 0.05));
+          e.y = GROUND_TOP_Y + 2 - Math.abs(wob) * 3;
+        }
         if (type.lobs && this.state === 'playing' && e.x < GAME_WIDTH - 70 && time > e.getData('nextLob')) {
           this.lobRock(e);
           e.setData('nextLob', time + Phaser.Math.Between(1400, 2400));
@@ -1528,6 +1543,10 @@ export default class GameScene extends Phaser.Scene {
     b.setData('fighting', false);
     b.setData('baseY', GROUND_TOP_Y + 6);
     b.setData('nextAttack', 0);
+    b.setData('phase', 1);
+    b.setData('vulnerable', false);
+    b.setData('tellUntil', 0);
+    b.setData('flashUntil', 0);
     this.boss = b;
 
     this.showBossBar(spec.name);
@@ -1545,24 +1564,116 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
+  // Bosses now cycle telegraphed attacks and enrage at half health. During the
+  // wind-up they glow and take DOUBLE damage — the "hit the weak spot" window.
   updateBoss(time) {
     const b = this.boss;
     if (!b || !b.active) return;
     const spec = b.getData('spec');
+    const isMini = spec.role === 'mini';
+    const bob = Math.sin(time * 0.004) * 6;
 
-    b.y = b.getData('baseY') + Math.sin(time * 0.004) * 6;
+    if (!b.getData('fighting')) {
+      b.y = b.getData('baseY') + bob;
+      return;
+    }
 
-    if (!b.getData('fighting')) return;
-    if (time < b.getData('nextAttack')) return;
+    // enrage at half health
+    if (b.getData('phase') === 1 && b.getData('hp') <= b.getData('maxHp') * 0.5) {
+      b.setData('phase', 2);
+      this.bannerFlash(`${spec.name} is ENRAGED!`, '#ff7a7a');
+      this.cameras.main.shake(220, 0.006);
+    }
+    const phase = b.getData('phase');
+    const vuln = b.getData('vulnerable');
 
-    if (spec.role === 'mini') {
-      this.summonRunner();
-      b.setData('nextAttack', time + MINI_SUMMON_EVERY);
+    // motion: rear up and pulse while charging an attack
+    if (vuln) {
+      const pulse = 1 + Math.sin(time * 0.03) * 0.05;
+      b.setScale((spec.scale || 1) * pulse);
+      b.y = b.getData('baseY') + bob - 6;
     } else {
-      const enraged = b.getData('hp') <= b.getData('maxHp') * 0.5;
-      this.throwProjectile(b, spec.projTex);
-      if (enraged) this.time.delayedCall(260, () => b.active && this.throwProjectile(b, spec.projTex));
-      b.setData('nextAttack', time + (enraged ? BOSS_THROW_EVERY * 0.7 : BOSS_THROW_EVERY));
+      b.setScale(spec.scale || 1);
+      b.y = b.getData('baseY') + bob;
+    }
+
+    // drive tint from state (unless a hit-flash is briefly showing)
+    if (time > (b.getData('flashUntil') || 0)) {
+      if (vuln) b.setTint(0xffd76a); // glowing = punish window
+      else if (phase === 2) b.setTint(0xffb0b0); // enraged red
+      else b.clearTint();
+    }
+
+    // resolve a telegraph → fire the attack
+    if (vuln) {
+      if (time >= b.getData('tellUntil')) {
+        b.setData('vulnerable', false);
+        this.execBossAttack(b, spec, b.getData('pending'), phase, isMini);
+        const cad = (phase === 2 ? 1150 : 1750) + Phaser.Math.Between(-150, 250);
+        b.setData('nextAttack', time + cad);
+      }
+      return;
+    }
+
+    // begin a new attack telegraph
+    if (time >= (b.getData('nextAttack') || 0)) {
+      const pool = isMini
+        ? (phase === 2 ? ['summon', 'lob'] : ['summon'])
+        : (phase === 2 ? (spec.attacks || ['lob']).concat(spec.rage || []) : spec.attacks || ['lob']);
+      b.setData('pending', pool[Math.floor(Math.random() * pool.length)]);
+      b.setData('vulnerable', true);
+      b.setData('tellUntil', time + 520);
+      this.spark(b.x, b.y - b.displayHeight * 0.55, 0xffe08a);
+      sound.bossHit();
+    }
+  }
+
+  execBossAttack(b, spec, key, phase, isMini) {
+    const tex = spec.projTex || 'enemy-rock';
+    switch (key) {
+      case 'summon':
+        this.summonRunner();
+        this.summonRunner();
+        if (phase === 2) this.summonRunner();
+        break;
+      case 'spread':
+        this.bossSpread(b, tex, phase);
+        break;
+      case 'barrage':
+        this.bossBarrage(b, tex, phase);
+        break;
+      case 'lob':
+      default:
+        this.throwProjectile(b, tex);
+        if (phase === 2 && !isMini) this.time.delayedCall(240, () => b.active && this.throwProjectile(b, tex));
+    }
+  }
+
+  // A fan of projectiles.
+  bossSpread(b, tex, phase) {
+    const n = phase === 2 ? 4 : 3;
+    for (let i = 0; i < n; i++) {
+      const c = this.enemyShots.create(b.x - 40, b.y - 90, tex);
+      c.body.setAllowGravity(true);
+      c.body.setGravityY(760);
+      const off = i - (n - 1) / 2;
+      c.setVelocity(-540 + off * 60, -430 + Math.abs(off) * 34);
+      c.setData('spin', Phaser.Math.FloatBetween(-0.02, 0.02));
+    }
+  }
+
+  // A staggered rain of shots that land spread across the ground.
+  bossBarrage(b, tex, phase) {
+    const n = phase === 2 ? 4 : 3;
+    for (let i = 0; i < n; i++) {
+      this.time.delayedCall(i * 200, () => {
+        if (!b.active) return;
+        const c = this.enemyShots.create(b.x - 30, b.y - 100, tex);
+        c.body.setAllowGravity(true);
+        c.body.setGravityY(600);
+        c.setVelocity(-300 - i * 80 - Math.random() * 80, -520);
+        c.setData('spin', Phaser.Math.FloatBetween(-0.02, 0.02));
+      });
     }
   }
 
@@ -1585,15 +1696,24 @@ export default class GameScene extends Phaser.Scene {
   }
 
   onBulletHitBoss(bullet, boss) {
-    const dmg = bullet.getData('dmg') || this.weapon.damage;
+    let dmg = bullet.getData('dmg') || this.weapon.damage;
     bullet.destroy();
     if (!boss.active) return;
+    // hitting the boss mid-wind-up (glowing) lands a double-damage crit
+    const crit = boss.getData('vulnerable');
+    if (crit) {
+      dmg *= 2;
+      this.spark(boss.x, boss.y - boss.displayHeight * 0.5, 0xffe14d);
+    }
     const hp = boss.getData('hp') - dmg;
     boss.setData('hp', Math.max(0, hp));
     this.updateBossBar();
     sound.bossHit();
-    boss.setTintFill(0xffffff);
-    this.time.delayedCall(60, () => boss.active && boss.clearTint());
+    if (!crit) {
+      // brief white flash; updateBoss restores the state tint after flashUntil
+      boss.setTintFill(0xffffff);
+      boss.setData('flashUntil', this.time.now + 60);
+    }
     if (hp <= 0) this.defeatBoss(boss);
   }
 
