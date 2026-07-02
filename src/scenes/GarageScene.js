@@ -124,6 +124,17 @@ export default class GarageScene extends Phaser.Scene {
   buildShelves() {
     this.shelfLabel('BODIES', 78, 246);
     this.shelfLabel('WEAPONS', 78, 372);
+    // a shared tooltip that shows the hovered item's trait
+    this.tooltip = this.add
+      .text(GAME_WIDTH / 2, 250, '', {
+        fontFamily: FONTS.ui,
+        fontSize: '15px',
+        color: '#ffe14d',
+        stroke: '#1b1d2a',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setDepth(30);
     this.renderCards();
   }
 
@@ -184,14 +195,14 @@ export default class GarageScene extends Phaser.Scene {
     }
 
     const container = this.add.container(x, y);
-    const bg = this.add.rectangle(0, 0, 112, 100, fill, 1).setStrokeStyle(3, border);
+    const bg = this.add.rectangle(0, 0, 112, 116, fill, 1).setStrokeStyle(3, border);
     bg.setInteractive({ useHandCursor: true });
 
     const iconKey = kind === 'body' ? `body-${item.id}` : `wpn-${item.id}`;
-    const icon = this.add.image(0, -22, iconKey).setScale(kind === 'body' ? 0.5 : 1.2);
+    const icon = this.add.image(0, -32, iconKey).setScale(kind === 'body' ? 0.5 : 1.2);
 
     const name = this.add
-      .text(0, 18, item.name, {
+      .text(0, 8, item.name, {
         fontFamily: FONTS.ui,
         fontSize: '12px',
         color: UI.text,
@@ -200,8 +211,17 @@ export default class GarageScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
+    // compact stat chips so the trade-offs are visible at a glance
+    const stat = this.add
+      .text(0, 30, this.statLine(kind, item), {
+        fontFamily: FONTS.ui,
+        fontSize: '13px',
+        color: '#bfe6ff',
+      })
+      .setOrigin(0.5);
+
     const statusText = this.add
-      .text(0, 40, status, {
+      .text(0, 48, status, {
         fontFamily: FONTS.ui,
         fontSize: '12px',
         color: statusColor,
@@ -209,14 +229,31 @@ export default class GarageScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    container.add([bg, icon, name, statusText]);
+    container.add([bg, icon, name, stat, statusText]);
     if (dim) container.setAlpha(0.55);
 
-    bg.on('pointerover', () => container.setScale(1.05));
-    bg.on('pointerout', () => container.setScale(1));
+    bg.on('pointerover', () => {
+      container.setScale(1.05);
+      if (this.tooltip) this.tooltip.setText(item.trait || '');
+    });
+    bg.on('pointerout', () => {
+      container.setScale(1);
+      if (this.tooltip) this.tooltip.setText('');
+    });
     bg.on('pointerdown', () => this.onCardClick(kind, item, container));
 
     return container;
+  }
+
+  // A tiny stat readout: bodies show health + jump; weapons show damage +
+  // behaviour (splash/pierce) or fire-rate.
+  statLine(kind, item) {
+    if (kind === 'body') {
+      const jump = item.jump >= 1.1 ? '⤒⤒' : item.jump >= 1.0 ? '⤒' : '⤓';
+      return `❤${item.health}   ${jump}`;
+    }
+    const behav = item.splash ? '💥' : item.pierce ? '➤' : item.cooldown <= 150 ? '⚡⚡' : '⚡';
+    return `⚔${item.damage}   ${behav}`;
   }
 
   onCardClick(kind, item, container) {

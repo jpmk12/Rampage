@@ -73,6 +73,16 @@ export default class BootScene extends Phaser.Scene {
     LEVELS.forEach((lv) => {
       const b = lv.biome;
       this.makeSky(`sky-${lv.id}`, GAME_WIDTH, GAME_HEIGHT, b.skyTop, b.skyBottom);
+      // hazy distant mountains: the far colour blended halfway toward the sky
+      const haze = Phaser.Display.Color.IntegerToColor(b.far).clone();
+      const skyc = Phaser.Display.Color.IntegerToColor(b.skyBottom);
+      const mtn = Phaser.Display.Color.GetColor(
+        (haze.red + skyc.red) / 2,
+        (haze.green + skyc.green) / 2,
+        (haze.blue + skyc.blue) / 2
+      );
+      this.makeMountains(`mtns-${lv.id}`, 480, 200, mtn);
+      this.makeProp(`prop-${lv.id}`, lv.id, b);
       this.makeHill(`hills-far-${lv.id}`, 360, 150, b.far, 0.55);
       this.makeHill(`hills-near-${lv.id}`, 300, 210, b.near, 0.7);
       this.makeGround(`ground-${lv.id}`, 256, 90, b.ground, b.groundEdge);
@@ -122,6 +132,101 @@ export default class BootScene extends Phaser.Scene {
     g.closePath();
     g.fillPath();
     g.generateTexture(key, w, h);
+    g.destroy();
+  }
+
+  // Jagged distant mountain range (tiles horizontally; both edges at baseline).
+  makeMountains(key, w, h, color) {
+    if (this.textures.exists(key)) return;
+    const g = this.add.graphics();
+    g.fillStyle(color, 1);
+    // silhouette of a few peaks; endpoints at the baseline so it tiles
+    const pts = [
+      [0, h], [w * 0.1, h * 0.34], [w * 0.2, h * 0.72], [w * 0.32, h * 0.12],
+      [w * 0.46, h * 0.66], [w * 0.6, h * 0.28], [w * 0.72, h * 0.7],
+      [w * 0.86, h * 0.18], [w, h],
+    ];
+    g.beginPath();
+    g.moveTo(0, h);
+    pts.forEach(([x, y]) => g.lineTo(x, y));
+    g.closePath();
+    g.fillPath();
+    // soft snow/haze caps on the tallest peaks
+    const cc = Phaser.Display.Color.IntegerToColor(color);
+    const cap = Phaser.Display.Color.GetColor(
+      Math.min(255, cc.red + 40),
+      Math.min(255, cc.green + 40),
+      Math.min(255, cc.blue + 40)
+    );
+    g.fillStyle(cap, 0.9);
+    [[w * 0.32, h * 0.12], [w * 0.86, h * 0.18]].forEach(([x, y]) => {
+      g.fillTriangle(x, y, x - 14, y + 26, x + 14, y + 26);
+    });
+    g.generateTexture(key, w, h);
+    g.destroy();
+  }
+
+  // A per-biome scenery prop (tree/cactus/etc.) that scrolls along the ground.
+  // Origin is bottom-centre so it plants on the road. 64x96.
+  makeProp(key, id, biome) {
+    if (this.textures.exists(key)) return;
+    const W = 64;
+    const H = 96;
+    const g = this.add.graphics();
+    const trunk = 0x6b4f2a;
+    if (id === 1) {
+      // leafy tree
+      g.fillStyle(trunk, 1);
+      g.fillRoundedRect(28, 44, 8, 52, 3);
+      g.fillStyle(0x4f8a26, 1);
+      g.fillCircle(32, 34, 22);
+      g.fillCircle(16, 44, 15);
+      g.fillCircle(48, 44, 15);
+      g.fillStyle(0x5fa84f, 1);
+      g.fillCircle(28, 30, 12);
+    } else if (id === 2) {
+      // bare dead tree
+      g.lineStyle(7, 0x5a4a38, 1);
+      g.beginPath();
+      g.moveTo(32, 96); g.lineTo(32, 40);
+      g.moveTo(32, 58); g.lineTo(14, 40);
+      g.moveTo(32, 52); g.lineTo(50, 34);
+      g.moveTo(32, 46); g.lineTo(20, 30);
+      g.strokePath();
+    } else if (id === 3) {
+      // cactus
+      g.fillStyle(0x3f7a34, 1);
+      g.fillRoundedRect(26, 30, 12, 66, 6);
+      g.fillRoundedRect(10, 50, 10, 26, 5);
+      g.fillRoundedRect(10, 50, 26, 10, 5);
+      g.fillRoundedRect(44, 40, 10, 30, 5);
+      g.fillRoundedRect(30, 40, 24, 10, 5);
+    } else if (id === 4) {
+      // snowy pine
+      g.fillStyle(trunk, 1);
+      g.fillRect(29, 80, 6, 16);
+      g.fillStyle(0x3f6b4a, 1);
+      [0, 20, 38].forEach((oy, i) => {
+        const half = 26 - i * 5;
+        g.fillTriangle(32, 18 + oy, 32 - half, 52 + oy, 32 + half, 52 + oy);
+      });
+      g.fillStyle(0xffffff, 0.85);
+      [0, 20, 38].forEach((oy, i) => {
+        const half = 26 - i * 5;
+        g.fillTriangle(32, 18 + oy, 32 - half * 0.5, 34 + oy, 32 + half * 0.5, 34 + oy);
+      });
+    } else {
+      // volcanic jagged rock with an ember glow
+      g.fillStyle(0x33383f, 1);
+      g.fillTriangle(32, 20, 4, 96, 60, 96);
+      g.fillStyle(0x44484f, 1);
+      g.fillTriangle(32, 20, 32, 96, 60, 96);
+      g.fillStyle(0xff7a3a, 0.9);
+      g.fillCircle(30, 40, 5);
+      g.fillStyle(0xffd24d, 0.9);
+      g.fillCircle(30, 40, 2.5);
+    }
+    g.generateTexture(key, W, H);
     g.destroy();
   }
 

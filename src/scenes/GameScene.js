@@ -89,6 +89,8 @@ export default class GameScene extends Phaser.Scene {
       this.levelStartScrap = profile.scrap;
     }
     this.weapon = getWeapon(profile.weapon);
+    // heavier bodies jump lower — a real trade-off vs. their extra health
+    this.carJump = (this.freestyle ? getBody('tank').jump : getBody(profile.body).jump) || 1;
     this.health = this.maxHealth;
 
     this.state = 'playing';
@@ -214,6 +216,10 @@ export default class GameScene extends Phaser.Scene {
       this.clouds.push(c);
     }
 
+    this.mountains = this.add
+      .tileSprite(0, GROUND_TOP_Y - 200, GAME_WIDTH, 200, `mtns-${id}`)
+      .setOrigin(0, 0)
+      .setAlpha(0.92);
     this.farHills = this.add
       .tileSprite(0, GROUND_TOP_Y - 150, GAME_WIDTH, 150, `hills-far-${id}`)
       .setOrigin(0, 0);
@@ -223,6 +229,35 @@ export default class GameScene extends Phaser.Scene {
     this.ground = this.add
       .tileSprite(0, GROUND_TOP_Y, GAME_WIDTH, 90, `ground-${id}`)
       .setOrigin(0, 0);
+    this.buildProps();
+  }
+
+  // Scenery props (trees/cacti/…) that roll past on the ground and recycle.
+  buildProps() {
+    this.props = [];
+    const n = 5;
+    for (let i = 0; i < n; i++) {
+      const p = this.add
+        .image((i / n) * GAME_WIDTH * 1.25 + Math.random() * 90, GROUND_TOP_Y + 5, `prop-${this.levelId}`)
+        .setOrigin(0.5, 1)
+        .setScale(0.7 + Math.random() * 0.5)
+        .setAlpha(0.97)
+        .setDepth(0);
+      p.flipX = Math.random() < 0.5;
+      this.props.push(p);
+    }
+  }
+
+  updateProps(delta) {
+    if (!this.props) return;
+    for (const p of this.props) {
+      p.x -= WORLD_SCROLL * delta;
+      if (p.x < -70) {
+        p.x = GAME_WIDTH + 70 + Math.random() * 160;
+        p.setScale(0.7 + Math.random() * 0.5);
+        p.flipX = Math.random() < 0.5;
+      }
+    }
   }
 
   updateClouds(delta) {
@@ -583,9 +618,11 @@ export default class GameScene extends Phaser.Scene {
   }
 
   scrollWorld(delta) {
+    this.mountains.tilePositionX += SCROLL.mountains * delta;
     this.farHills.tilePositionX += SCROLL.farHills * delta;
     this.nearHills.tilePositionX += SCROLL.nearHills * delta;
     this.ground.tilePositionX += SCROLL.ground * delta;
+    this.updateProps(delta);
   }
 
   advanceLevel(delta) {
@@ -599,7 +636,7 @@ export default class GameScene extends Phaser.Scene {
 
   tryJump() {
     if (this.state !== 'playing' || !this.onGround) return;
-    this.carVY = -CAR.jumpVel;
+    this.carVY = -CAR.jumpVel * (this.carJump || 1);
     this.onGround = false;
     sound.jump();
     this.carSquash(0.86, 1.16); // stretch up on launch
@@ -676,8 +713,15 @@ export default class GameScene extends Phaser.Scene {
     const y = type.lane === 'air' ? CAR.groundY - 120 : GROUND_TOP_Y + 2;
     const e = this.goblins.create(x, y, `${type.tex || type.key}-${this.levelId}`);
     e.setOrigin(0.5, type.lane === 'air' ? 0.5 : 1);
+    e.setDepth(1);
     if (type.scale) e.setScale(type.scale);
     e.setData('baseScale', type.scale || 1);
+    // a soft contact shadow grounds ground enemies (and reads their little hop)
+    if (type.lane !== 'air') {
+      const sc = type.scale || 1;
+      const shadow = this.add.ellipse(x, GROUND_TOP_Y + 4, 40 * sc, 12 * sc, 0x000000, 0.16).setDepth(0);
+      e.setData('shadow', shadow);
+    }
     e.body.setAllowGravity(false);
     e.setVelocityX(-type.speed);
     e.setData('type', type);
@@ -748,13 +792,15 @@ export default class GameScene extends Phaser.Scene {
   spawnFreestyleMega() {
     const hp = 22 + Math.floor((this.score || 0) * 0.6);
     const e = this.goblins.create(GAME_WIDTH + 90, GROUND_TOP_Y + 2, `brute-${this.levelId}`);
-    e.setOrigin(0.5, 1).setScale(MEGA.scale);
+    e.setOrigin(0.5, 1).setScale(MEGA.scale).setDepth(1);
     e.body.setAllowGravity(false);
     e.setVelocityX(-MEGA.speed);
     e.setData('type', { lane: 'ground', clearH: 999, mega: true, speed: MEGA.speed });
     e.setData('hp', hp);
     e.setData('maxHp', hp);
     e.setData('seed', Math.random() * Math.PI * 2);
+    const shadow = this.add.ellipse(e.x, GROUND_TOP_Y + 4, 70, 18, 0x000000, 0.18).setDepth(0);
+    e.setData('shadow', shadow);
     const bg = this.add.rectangle(e.x, 0, 72, 9, 0x1b1d2a, 0.7).setDepth(7);
     const fill = this.add.rectangle(e.x - 34, 0, 68, 5, 0xe2483a, 1).setOrigin(0, 0.5).setDepth(8);
     e.setData('hpbar', { bg, fill });
@@ -1059,6 +1105,8 @@ export default class GameScene extends Phaser.Scene {
     }
     const plate = e.getData('shieldSprite');
     if (plate) plate.destroy();
+    const shadow = e.getData('shadow');
+    if (shadow) shadow.destroy();
     e.destroy();
   }
 
@@ -1102,6 +1150,10 @@ export default class GameScene extends Phaser.Scene {
         }
         if (type.charges) this.updateCharger(e, time);
       }
+
+      // contact shadow stays on the ground under the enemy (reads the hop)
+      const shadow = e.getData('shadow');
+      if (shadow) shadow.x = e.x;
 
       // shielded enemies carry a plate that tracks in front of them
       const plate = e.getData('shieldSprite');
@@ -1211,11 +1263,26 @@ export default class GameScene extends Phaser.Scene {
 
   onBulletHit(bullet, goblin) {
     const dmg = bullet.getData('dmg') || this.weapon.damage;
-    if (bullet.getData('bomb')) {
-      this.explodeAt(bullet.x, bullet.y, 95, dmg);
+
+    // bombs and splash weapons (catapult/rocket) burst for area damage
+    if (bullet.getData('bomb') || bullet.getData('splash')) {
+      this.explodeAt(bullet.x, bullet.y, bullet.getData('splash') || 95, dmg);
       bullet.destroy();
       return;
     }
+
+    // piercing weapons (cannon) punch through a line of enemies
+    const pierce = bullet.getData('pierce');
+    if (pierce) {
+      const hits = bullet.getData('hits') || [];
+      if (hits.includes(goblin)) return; // don't hit the same enemy twice
+      hits.push(goblin);
+      bullet.setData('hits', hits);
+      this.hitEnemy(goblin, dmg);
+      if (hits.length >= pierce) bullet.destroy();
+      return;
+    }
+
     bullet.destroy();
     this.hitEnemy(goblin, dmg);
   }
@@ -1679,12 +1746,15 @@ export default class GameScene extends Phaser.Scene {
 
   summonRunner() {
     const e = this.goblins.create(GAME_WIDTH + 40, GROUND_TOP_Y + 2, `runner-${this.levelId}`);
-    e.setOrigin(0.5, 1);
+    e.setOrigin(0.5, 1).setDepth(1);
     e.body.setAllowGravity(false);
     e.setVelocityX(-320);
     e.setData('type', { lane: 'ground', clearH: 42, hp: 1, scrap: 1 });
     e.setData('hp', 1);
+    e.setData('baseScale', 1);
     e.setData('seed', Math.random() * Math.PI * 2);
+    const shadow = this.add.ellipse(e.x, GROUND_TOP_Y + 4, 40, 12, 0x000000, 0.16).setDepth(0);
+    e.setData('shadow', shadow);
   }
 
   throwProjectile(b, tex) {
@@ -1901,6 +1971,9 @@ export default class GameScene extends Phaser.Scene {
     shot.setRotation(this.aim);
     shot.body.setAllowGravity(false);
     shot.setVelocity(Math.cos(this.aim) * this.weapon.speed, Math.sin(this.aim) * this.weapon.speed);
+    shot.setData('dmg', this.weapon.damage);
+    if (this.weapon.splash) shot.setData('splash', this.weapon.splash);
+    if (this.weapon.pierce) shot.setData('pierce', this.weapon.pierce);
     sound.shoot();
     this.muzzleFlash(mx, my);
 

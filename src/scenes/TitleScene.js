@@ -42,6 +42,7 @@ export default class TitleScene extends Phaser.Scene {
       this.clouds.push(c);
     }
 
+    this.mountains = this.add.tileSprite(0, GROUND_TOP_Y - 200, GAME_WIDTH, 200, 'mtns-1').setOrigin(0, 0).setAlpha(0.92);
     this.farHills = this.add.tileSprite(0, GROUND_TOP_Y - 150, GAME_WIDTH, 150, 'hills-far-1').setOrigin(0, 0);
     this.nearHills = this.add.tileSprite(0, GROUND_TOP_Y - 210, GAME_WIDTH, 210, 'hills-near-1').setOrigin(0, 0);
     this.ground = this.add.tileSprite(0, GROUND_TOP_Y, GAME_WIDTH, 90, 'ground-1').setOrigin(0, 0);
@@ -185,6 +186,7 @@ export default class TitleScene extends Phaser.Scene {
       c.x -= c.getData('speed') * delta;
       if (c.x < -120) c.x = GAME_WIDTH + 120;
     });
+    this.mountains.tilePositionX += SCROLL.mountains * delta;
     this.farHills.tilePositionX += SCROLL.farHills * delta;
     this.nearHills.tilePositionX += SCROLL.nearHills * delta;
     this.ground.tilePositionX += SCROLL.ground * delta;

@@ -135,6 +135,16 @@ audio still generated in code, no binary assets.
   that window for a **double-damage crit**. Mini-bosses summon in waves.
 - **Animation:** cars roll on **spinning spoked wheels**, ground enemies waddle
   with a hop-and-squash walk, and flyers flap their wings.
+- **Upgrade identity:** bodies now trade **health for jump height** (light
+  Cardboard springs highest; the Battle Tank is toughest but grounded), and
+  weapons have real behaviours — the **Catapult** and **Rocket** deal **splash**
+  damage (clear crowds), the **Cannon pierces** through a line of enemies. The
+  Garage shows a stat chip (❤/jump, ⚔/behaviour) on every card plus a hover
+  tooltip, so the trade-offs are clear (the Catapult is no longer a trap buy).
+- **Living backgrounds:** a new hazy **distant-mountain** parallax layer and
+  scrolling **biome props** (leafy trees, dead trees, cacti, snowy pines,
+  volcanic rocks) give each land real depth, and ground enemies cast **contact
+  shadows**.
 
 **Polish & shell (done):** a **title screen** (your current car idling on an
 animated landscape) with **PLAY**, **⚡ Freestyle**, a **Kid Mode** toggle, and —

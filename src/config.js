@@ -45,6 +45,7 @@ export const HAZARD = {
 
 // Parallax scroll speeds (px per millisecond) for each background layer.
 export const SCROLL = {
+  mountains: 0.008, // furthest layer, barely creeps
   farHills: 0.02,
   nearHills: 0.06,
   ground: 0.32,
