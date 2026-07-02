@@ -16,7 +16,7 @@ import {
 } from '../config.js';
 import { Player } from '../state/PlayerState.js';
 import { getBody, getWeapon } from '../data/catalog.js';
-import { pickEnemyType } from '../data/enemies.js';
+import { ENEMY_TYPES, pickEnemyType, pickEnemyForLevel } from '../data/enemies.js';
 import { pickPickup } from '../data/freestyle.js';
 import { getLevel, LAST_LEVEL } from '../data/levels.js';
 import { buildCar, muzzleFor, addTurret } from '../entities/Car.js';
@@ -27,6 +27,9 @@ const BOSS_THROW_EVERY = 1600; // ms between boss projectile throws
 
 // Hazards you must jump over are disabled for now (per request).
 const HAZARDS_ENABLED = false;
+
+// Kill-combo: chain defeats within this window to build a score/loot multiplier.
+const COMBO_WINDOW = 2200; // ms before a streak lapses
 
 // Freestyle: each weapon fires at most this many projectiles per volley.
 // Pickups collected beyond the cap stop adding projectiles and instead LEVEL
@@ -103,6 +106,8 @@ export default class GameScene extends Phaser.Scene {
     this.aimPointerId = null;
     this.aimTargetY = GROUND_TOP_Y - 120;
     this.invulnUntil = 0;
+    this.combo = 0;
+    this.comboUntil = 0;
 
     this.spawnGap = Math.max(420, ENEMY.spawnEveryMin - (this.level - 1) * 70);
 
@@ -428,6 +433,13 @@ export default class GameScene extends Phaser.Scene {
       this.add.image(GAME_WIDTH / 2 + 132, 24, 'flag').setScale(0.18).setDepth(20);
     }
 
+    // kill-combo readout (hidden until a streak builds)
+    this.comboText = this.add
+      .text(GAME_WIDTH / 2, 112, '', { fontFamily: FONTS.display, fontSize: '30px', color: '#ffd34d', stroke: '#1b1d2a', strokeThickness: 5 })
+      .setOrigin(0.5)
+      .setDepth(21)
+      .setAlpha(0);
+
     // subtle touch hints
     const hint = { fontFamily: FONTS.ui, fontSize: '13px', color: '#ffffff' };
     this.add.text(20, GAME_HEIGHT - 26, '⤒ tap = jump', hint).setAlpha(0.35).setDepth(20);
@@ -516,6 +528,7 @@ export default class GameScene extends Phaser.Scene {
         this.fireTurrets(time);
       }
       this.emitDust(time);
+      if (this.combo > 0 && time > this.comboUntil) this.resetCombo();
     }
     this.updateClouds(delta);
     this.updateCarPhysics(delta);
@@ -647,7 +660,7 @@ export default class GameScene extends Phaser.Scene {
   maybeSpawnGoblin(time) {
     if (this.distance >= LEVEL.length) return;
     if (time < this.nextSpawnAt) return;
-    this.spawnEnemy(pickEnemyType(Math.random));
+    this.spawnEnemy(pickEnemyForLevel(this.levelCfg, Math.random));
     const gap = Phaser.Math.Between(this.spawnGap, this.spawnGap + 800);
     this.nextSpawnAt = time + gap;
   }
@@ -656,8 +669,9 @@ export default class GameScene extends Phaser.Scene {
   spawnEnemy(type, horde = false) {
     const x = GAME_WIDTH + 50 + (horde ? Phaser.Math.Between(0, 140) : 0);
     const y = type.lane === 'air' ? CAR.groundY - 120 : GROUND_TOP_Y + 2;
-    const e = this.goblins.create(x, y, `${type.key}-${this.levelId}`);
+    const e = this.goblins.create(x, y, `${type.tex || type.key}-${this.levelId}`);
     e.setOrigin(0.5, type.lane === 'air' ? 0.5 : 1);
+    if (type.scale) e.setScale(type.scale);
     e.body.setAllowGravity(false);
     e.setVelocityX(-type.speed);
     e.setData('type', type);
@@ -665,6 +679,20 @@ export default class GameScene extends Phaser.Scene {
     e.setData('seed', Math.random() * Math.PI * 2);
     if (type.lane === 'air') e.setData('baseY', y);
     if (type.lobs) e.setData('nextLob', this.time.now + Phaser.Math.Between(600, 1200));
+    if (type.charges) {
+      e.setData('chargeState', 'cruise');
+      e.setData('chargeNext', this.time.now + Phaser.Math.Between(500, 1100));
+    }
+    if (type.shield) {
+      e.setData('shield', type.shield);
+      const plate = this.add
+        .image(e.x - 24, e.y - 34, 'shield-plate')
+        .setOrigin(0.5, 0.5)
+        .setTint(this.levelCfg.enemyPal ? this.levelCfg.enemyPal.dark : 0x8a8f98)
+        .setDepth(6);
+      if (type.scale) plate.setScale(type.scale);
+      e.setData('shieldSprite', plate);
+    }
     if (horde) e.setData('horde', true);
     return e;
   }
@@ -1023,6 +1051,8 @@ export default class GameScene extends Phaser.Scene {
       bar.bg.destroy();
       bar.fill.destroy();
     }
+    const plate = e.getData('shieldSprite');
+    if (plate) plate.destroy();
     e.destroy();
   }
 
@@ -1041,14 +1071,26 @@ export default class GameScene extends Phaser.Scene {
       const t = this.time.now * 0.012 + e.getData('seed');
 
       if (type.lane === 'air') {
-        e.y = e.getData('baseY') + Math.sin(t * 1.6) * 26;
+        if (type.dives && this.state === 'playing' && e.x < this.car.x + 340) {
+          // swoop toward the car's height
+          const carCY = this.carCenterY();
+          e.y += Math.sign(carCY - e.y) * Math.min(Math.abs(carCY - e.y), 3.4);
+          e.rotation = Phaser.Math.Clamp((carCY - e.y) * -0.004, -0.3, 0.3);
+        } else {
+          e.y = e.getData('baseY') + Math.sin(t * 1.6) * 26;
+        }
       } else {
         e.rotation = Math.sin(t * 1.5) * 0.08;
         if (type.lobs && this.state === 'playing' && e.x < GAME_WIDTH - 70 && time > e.getData('nextLob')) {
           this.lobRock(e);
           e.setData('nextLob', time + Phaser.Math.Between(1400, 2400));
         }
+        if (type.charges) this.updateCharger(e, time);
       }
+
+      // shielded enemies carry a plate that tracks in front of them
+      const plate = e.getData('shieldSprite');
+      if (plate) plate.setPosition(e.x - 24 * (type.scale || 1), e.y - 34 * (type.scale || 1));
 
       // keep a mega's health bar floating above it
       if (type.mega) {
@@ -1080,6 +1122,36 @@ export default class GameScene extends Phaser.Scene {
       }
       return true;
     });
+  }
+
+  // Charger cycle: cruise → wind up (blink telegraph) → dash forward → cruise.
+  updateCharger(e, time) {
+    if (this.state !== 'playing') return;
+    const st = e.getData('chargeState');
+    const next = e.getData('chargeNext') || 0;
+    if (st === 'cruise') {
+      if (time > next && e.x < GAME_WIDTH - 40 && e.x > this.car.x + 130) {
+        e.setData('chargeState', 'tell');
+        e.setData('chargeNext', time + 340);
+        e.setVelocityX(-40); // rear up before the dash
+      }
+    } else if (st === 'tell') {
+      if (Math.floor(time / 80) % 2) e.setTintFill(0xffef9f);
+      else e.clearTint();
+      if (time > next) {
+        e.clearTint();
+        e.setData('chargeState', 'dash');
+        e.setData('chargeNext', time + 600);
+        e.setVelocityX(-560);
+        this.spark(e.x, e.y - 24, 0xffd76a);
+      }
+    } else if (st === 'dash') {
+      if (time > next) {
+        e.setData('chargeState', 'cruise');
+        e.setData('chargeNext', time + Phaser.Math.Between(900, 1500));
+        e.setVelocityX(-e.getData('type').speed);
+      }
+    }
   }
 
   lobRock(lobber) {
@@ -1135,6 +1207,25 @@ export default class GameScene extends Phaser.Scene {
 
   hitEnemy(goblin, dmg) {
     if (!goblin.active) return;
+
+    // shielded enemies soak hits on the front plate first (one chip per hit)
+    const sh = goblin.getData('shield');
+    if (sh > 0) {
+      const plate = goblin.getData('shieldSprite');
+      this.spark(plate ? plate.x : goblin.x - 20, goblin.y - 30, 0xbfe6ff);
+      const left = sh - 1;
+      goblin.setData('shield', left);
+      if (left <= 0) {
+        if (plate) {
+          this.poof(plate.x, plate.y, 0xbfe6ff);
+          plate.destroy();
+        }
+        goblin.setData('shieldSprite', null);
+        this.floatNumber(goblin.x, goblin.y - 58, 'SHIELD DOWN!', '#bfe6ff', 15);
+      }
+      return; // the plate absorbs this shot
+    }
+
     const hp = goblin.getData('hp') - dmg;
     if (hp > 0) {
       goblin.setData('hp', hp);
@@ -1148,37 +1239,63 @@ export default class GameScene extends Phaser.Scene {
 
   defeatGoblin(goblin) {
     const type = goblin.getData('type');
+    const gx = goblin.x;
     const yy = type.lane === 'air' ? goblin.y : goblin.y - 26;
     sound.defeat();
-    this.poof(goblin.x, yy, COLORS.goblin);
+    this.poof(gx, yy, COLORS.goblin);
     if (type.mega) {
-      this.poof(goblin.x, yy, 0xffe14d);
-      this.shockRing(goblin.x, yy, 0xffe14d, 90);
+      this.poof(gx, yy, 0xffe14d);
+      this.shockRing(gx, yy, 0xffe14d, 90);
       this.cameras.main.shake(90, 0.003);
     }
 
+    // splitters burst into little runts (a chain-reaction combo feeder)
+    if (type.splits) this.spawnRunts(goblin, type.splits);
+
+    // every kill builds the streak multiplier
+    const mult = this.bumpCombo();
+
     if (this.freestyle) {
-      this.score += type.mega ? 5 : 1;
+      const gained = (type.mega ? 5 : 1) * mult;
+      this.score += gained;
       this.scoreText.setText('SCORE ' + this.score);
       Player.setFreestyleBest(this.score);
-      if (type.mega) {
-        this.floatNumber(goblin.x, yy - 20, '+5', '#ffe14d', 28);
-        this.dropPickup(goblin.x, yy);
-      }
-      else if (Math.random() < 0.18) this.dropPickup(goblin.x, yy);
+      if (mult > 1 || type.mega) this.floatNumber(gx, yy - 20, `+${gained}`, mult >= 3 ? '#ff8a3a' : '#ffe14d', type.mega ? 28 : 22);
+      if (type.mega) this.dropPickup(gx, yy);
+      else if (Math.random() < 0.18) this.dropPickup(gx, yy);
       this.removeEnemy(goblin);
       return;
     }
 
-    for (let i = 0; i < (type.scrap || 1); i++) {
-      this.spawnScrap(goblin.x + Phaser.Math.Between(-12, 12), yy + Phaser.Math.Between(-8, 8));
+    // combo makes more loot fly out (capped so it never floods the screen)
+    const pieces = Math.min(12, (type.scrap || 1) * mult);
+    for (let i = 0; i < pieces; i++) {
+      this.spawnScrap(gx + Phaser.Math.Between(-14, 14), yy + Phaser.Math.Between(-8, 8));
     }
+    if (mult > 1) this.floatNumber(gx, yy - 20, `x${mult}!`, mult >= 3 ? '#ff8a3a' : '#ffd34d', 22);
     if (goblin.getData('horde')) {
       this.hordeDefeated += 1;
       this.hordeAlive -= 1;
     }
     this.removeEnemy(goblin);
     if (type.mega) this.rewardTurret();
+  }
+
+  // Spawn a splitter's little runts at its position, inheriting horde bookkeeping.
+  spawnRunts(parent, n) {
+    for (let i = 0; i < n; i++) {
+      const c = this.spawnEnemy(ENEMY_TYPES.runt);
+      c.x = parent.x + Phaser.Math.Between(-12, 12);
+      c.y = GROUND_TOP_Y + 2;
+      c.setVelocityX(-ENEMY_TYPES.runt.speed - Phaser.Math.Between(0, 90));
+      this.poof(c.x, c.y - 20, COLORS.goblin);
+      // runts count as extra live enemies to clear, but NOT toward the spawn
+      // target (hordeSpawned/hordeTotal) — otherwise the wave never "completes".
+      if (parent.getData('horde')) {
+        c.setData('horde', true);
+        this.hordeAlive += 1;
+      }
+    }
   }
 
   // Mega defeated → bolt a turret on (live), or bonus scrap if already maxed.
@@ -1241,6 +1358,8 @@ export default class GameScene extends Phaser.Scene {
     this.hurtFlash.setAlpha(0.4);
     this.tweens.add({ targets: this.hurtFlash, alpha: 0, duration: 320 });
     this.renderHearts();
+    if (this.combo > 2) this.floatNumber(this.car.x, this.car.y - 90, 'COMBO LOST', '#ff7a7a', 16);
+    this.resetCombo(); // a hit breaks the streak
 
     // blink the car while invulnerable
     this.tweens.add({
@@ -1364,7 +1483,7 @@ export default class GameScene extends Phaser.Scene {
   updateHorde(time) {
     // stagger the wave in
     if (this.hordeSpawned < this.hordeTotal && time >= this.nextHordeSpawnAt) {
-      this.spawnEnemy(pickEnemyType(Math.random), true);
+      this.spawnEnemy(pickEnemyForLevel(this.levelCfg, Math.random), true);
       this.hordeSpawned += 1;
       this.hordeAlive += 1;
       this.nextHordeSpawnAt = time + Phaser.Math.Between(220, 360);
@@ -1707,6 +1826,48 @@ export default class GameScene extends Phaser.Scene {
     if (this._squashTween) this._squashTween.stop(); // only the scale tween, not alpha/recoil
     this.car.setScale(sx, sy);
     this._squashTween = this.tweens.add({ targets: this.car, scaleX: 1, scaleY: 1, duration: 220, ease: 'Back.easeOut' });
+  }
+
+  // A few quick sparks (shield pings, dash bursts).
+  spark(x, y, color) {
+    for (let i = 0; i < 3; i++) {
+      const s = this.add.image(x, y, 'puff').setTint(color).setScale(0.4).setDepth(7);
+      const a = Math.random() * Math.PI * 2;
+      this.tweens.add({ targets: s, x: x + Math.cos(a) * 16, y: y + Math.sin(a) * 16, alpha: 0, scale: 0.1, duration: 200, onComplete: () => s.destroy() });
+    }
+  }
+
+  // ---- kill combo -------------------------------------------------------
+
+  comboMult() {
+    return Math.min(5, 1 + Math.floor(this.combo / 3));
+  }
+
+  // Register a kill toward the streak; returns the current score/loot multiplier.
+  bumpCombo() {
+    this.combo += 1;
+    this.comboUntil = this.time.now + COMBO_WINDOW;
+    const m = this.comboMult();
+    if (this.combo >= 2) this.showCombo(m);
+    return m;
+  }
+
+  showCombo(m) {
+    const tiers = ['#ffd34d', '#ffd34d', '#ffb04a', '#ff8a3a', '#ff5d4d', '#ff5d4d'];
+    this.comboText.setText(`🔥 COMBO x${m}   (${this.combo})`);
+    this.comboText.setColor(tiers[m] || '#ff5d4d');
+    this.comboText.setAlpha(1);
+    this.comboText.setScale(1.3);
+    this.tweens.killTweensOf(this.comboText);
+    this.tweens.add({ targets: this.comboText, scale: 1, duration: 180, ease: 'Back.easeOut' });
+  }
+
+  resetCombo() {
+    this.combo = 0;
+    if (this.comboText) {
+      this.tweens.killTweensOf(this.comboText);
+      this.tweens.add({ targets: this.comboText, alpha: 0, duration: 220 });
+    }
   }
 
   // A small floating number/label that drifts up and fades (kill rewards, etc.).

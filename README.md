@@ -115,6 +115,21 @@ Iron Buggy → Armored Truck → Battle Tank, each gated behind a boss drop) and
 boss rolls the victory/Champion ending. It's a complete game — all art and
 audio still generated in code, no binary assets.
 
+**Next-level pass — crispness, juice, variety (done):**
+- **Crisp rendering:** the smooth vector art is now antialiased (was running in
+  jagged pixel-art mode) — sharper sprites, fonts, and backgrounds everywhere.
+- **Game feel:** star-burst muzzle flashes, car squash-&-stretch on jump/land,
+  explosion shock-rings, a screen-flash on boss kills, and floating reward
+  numbers.
+- **Signature enemies + per-biome rosters:** on top of runner/brute/lobber/flyer,
+  each land now mixes in its own threats — **chargers** (wind up and dash),
+  **shielded** foes (break the front plate first), **splitters** (burst into
+  little runts), and **divers** (swoop from the air). Every biome pulls from its
+  own spawn table, so levels finally play differently, not just recoloured.
+- **Kill combos:** chain defeats to build a **x2–x5 multiplier** (more score in
+  Freestyle, more loot in the campaign). A hit breaks the streak — so there's a
+  reason to play cleanly.
+
 **Polish & shell (done):** a **title screen** (your current car idling on an
 animated landscape) with **PLAY**, **⚡ Freestyle**, a **Kid Mode** toggle, and —
 when applicable — **New Game** and **🔄 Reset Freestyle arsenal**; a **pause

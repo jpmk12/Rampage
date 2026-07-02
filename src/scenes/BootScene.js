@@ -54,6 +54,7 @@ export default class BootScene extends Phaser.Scene {
     this.makeBolt('bolt');
     this.makeAxle('axle');
     this.makeTurret('turret');
+    this.makeShieldPlate('shield-plate');
     this.makeCloud('cloud');
     this.makeSun('sun');
     this.makeFlake('flake');
@@ -687,6 +688,32 @@ export default class BootScene extends Phaser.Scene {
     g.fillRoundedRect(30, 9, 20, 10, 3);
     g.fillStyle(0x55606b, 1);
     g.fillRoundedRect(46, 7, 5, 14, 2);
+    g.generateTexture(key, W, H);
+    g.destroy();
+  }
+
+  // A rounded shield plate a shielded enemy holds up front. Drawn light so it
+  // can be tinted to each biome's dark palette colour at spawn; a boss/brute
+  // must be shot enough to break it before the body takes damage.
+  makeShieldPlate(key) {
+    if (this.textures.exists(key)) return;
+    const W = 26;
+    const H = 54;
+    const g = this.add.graphics();
+    // plate body
+    g.fillStyle(0xffffff, 1);
+    g.fillRoundedRect(3, 2, 20, 50, 9);
+    // inner panel (slightly darker so the tint reads as shaded)
+    g.fillStyle(0xcfd3da, 1);
+    g.fillRoundedRect(7, 7, 12, 40, 6);
+    // vertical highlight
+    g.fillStyle(0xffffff, 1);
+    g.fillRoundedRect(9, 9, 4, 36, 2);
+    // boss/rim outline + centre stud
+    g.lineStyle(3, 0x9aa0ab, 1);
+    g.strokeRoundedRect(3, 2, 20, 50, 9);
+    g.fillStyle(0x9aa0ab, 1);
+    g.fillCircle(13, 27, 3.4);
     g.generateTexture(key, W, H);
     g.destroy();
   }
