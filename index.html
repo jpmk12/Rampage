@@ -51,8 +51,9 @@
         justify-content: center;
       }
       #game canvas {
-        /* keep the canvas crisp for our chunky cartoon art */
-        image-rendering: pixelated;
+        /* smooth vector-cartoon art — let the browser antialias the upscale
+           to the window instead of forcing hard nearest-neighbor edges */
+        image-rendering: auto;
       }
       #fatal {
         display: none;

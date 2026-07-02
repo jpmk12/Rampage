@@ -13,7 +13,14 @@ const config = {
   width: GAME_WIDTH,
   height: GAME_HEIGHT,
   backgroundColor: '#1b1d2a',
-  pixelArt: true,
+  // The art is smooth vector-cartoon, not pixel art — so antialias it. Leaving
+  // pixelArt on (its old default) disabled AA and forced nearest-neighbor
+  // sampling, which jagged every scaled/rotated sprite and font edge.
+  render: {
+    antialias: true,
+    roundPixels: true,
+    powerPreference: 'high-performance',
+  },
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,

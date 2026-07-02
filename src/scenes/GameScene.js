@@ -591,6 +591,7 @@ export default class GameScene extends Phaser.Scene {
     this.carVY = -CAR.jumpVel;
     this.onGround = false;
     sound.jump();
+    this.carSquash(0.86, 1.16); // stretch up on launch
   }
 
   updateCarPhysics(delta) {
@@ -611,6 +612,7 @@ export default class GameScene extends Phaser.Scene {
         this.carVY = 0;
         this.onGround = true;
         this.landPuff();
+        this.carSquash(1.18, 0.82); // squash flat on landing
       }
     }
     // tilt slightly while airborne for juice
@@ -778,7 +780,10 @@ export default class GameScene extends Phaser.Scene {
       const dmg = base * 3 * this.fsBoost('bombs');
       for (let i = 0; i < bN; i++) this.lobBomb(dmg);
     }
-    if (fired) sound.shoot();
+    if (fired) {
+      sound.shoot();
+      this.muzzleFlash(this.car.x + 48, this.car.y - 48, 1.15);
+    }
   }
 
   fireBolt(angle, tex, speed, dmg, scale) {
@@ -806,6 +811,7 @@ export default class GameScene extends Phaser.Scene {
   explodeAt(x, y, radius, dmg) {
     this.poof(x, y, 0xffd24d);
     this.poof(x, y - 10, 0xff7a3a);
+    this.shockRing(x, y - 6, 0xffb04a, radius * 1.1);
     sound.explode();
     this.cameras.main.shake(120, 0.004);
     this.goblins.children.iterate((e) => {
@@ -1145,13 +1151,20 @@ export default class GameScene extends Phaser.Scene {
     const yy = type.lane === 'air' ? goblin.y : goblin.y - 26;
     sound.defeat();
     this.poof(goblin.x, yy, COLORS.goblin);
-    if (type.mega) this.poof(goblin.x, yy, 0xffe14d);
+    if (type.mega) {
+      this.poof(goblin.x, yy, 0xffe14d);
+      this.shockRing(goblin.x, yy, 0xffe14d, 90);
+      this.cameras.main.shake(90, 0.003);
+    }
 
     if (this.freestyle) {
       this.score += type.mega ? 5 : 1;
       this.scoreText.setText('SCORE ' + this.score);
       Player.setFreestyleBest(this.score);
-      if (type.mega) this.dropPickup(goblin.x, yy);
+      if (type.mega) {
+        this.floatNumber(goblin.x, yy - 20, '+5', '#ffe14d', 28);
+        this.dropPickup(goblin.x, yy);
+      }
       else if (Math.random() < 0.18) this.dropPickup(goblin.x, yy);
       this.removeEnemy(goblin);
       return;
@@ -1473,9 +1486,14 @@ export default class GameScene extends Phaser.Scene {
     this.boss = null;
     this.hideBossBar();
     sound.explode();
-    for (let i = 0; i < 5; i++) {
-      this.time.delayedCall(i * 90, () =>
-        this.poof(bx + Phaser.Math.Between(-40, 40), by + Phaser.Math.Between(-30, 30), 0xffe14d)
+    // a punchy multi-ring blast + white camera flash to sell the kill
+    this.shockRing(bx, by, 0xfff2b0, 150, 420);
+    this.time.delayedCall(120, () => this.shockRing(bx, by, 0xffb04a, 210, 500));
+    this.cameras.main.flash(180, 255, 240, 200);
+    this.cameras.main.shake(240, 0.008);
+    for (let i = 0; i < 8; i++) {
+      this.time.delayedCall(i * 80, () =>
+        this.poof(bx + Phaser.Math.Between(-50, 50), by + Phaser.Math.Between(-36, 36), i % 2 ? 0xffe14d : 0xff7a3a)
       );
     }
 
@@ -1483,6 +1501,7 @@ export default class GameScene extends Phaser.Scene {
       // big reward + schedule the next, tougher boss
       this.score += 10;
       this.scoreText.setText('SCORE ' + this.score);
+      this.floatNumber(bx, by - 30, '+10', '#9fe6a0', 34);
       Player.setFreestyleBest(this.score);
       const drops = 3 + Math.floor(this.fsBossCount / 2);
       for (let i = 0; i < drops; i++) {
@@ -1654,14 +1673,56 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  muzzleFlash(x, y) {
-    const f = this.add.image(x, y, 'puff').setTint(0xffe08a).setScale(0.7).setDepth(6);
+  // ---- game feel / juice -----------------------------------------------
+
+  // A quick spark at the barrel: a bright star flash plus a soft glow.
+  muzzleFlash(x, y, scale = 1) {
+    const star = this.add
+      .star(x, y, 5, 3 * scale, 9 * scale, 0xfff2b0)
+      .setDepth(6)
+      .setAlpha(0.95);
+    this.tweens.add({ targets: star, scaleX: 0.2, scaleY: 0.2, alpha: 0, angle: 40, duration: 120, onComplete: () => star.destroy() });
+    const glow = this.add.image(x, y, 'puff').setTint(0xffd76a).setScale(0.8 * scale).setDepth(5).setAlpha(0.7);
+    this.tweens.add({ targets: glow, scale: 0.2, alpha: 0, duration: 140, onComplete: () => glow.destroy() });
+  }
+
+  // An expanding shock ring for explosions and big defeats.
+  shockRing(x, y, color = 0xffe08a, maxR = 70, dur = 340) {
+    const ring = this.add.circle(x, y, 6).setStrokeStyle(4, color, 0.9).setDepth(9);
+    ring.setFillStyle();
     this.tweens.add({
-      targets: f,
-      scale: 0.2,
+      targets: ring,
+      scale: maxR / 6,
       alpha: 0,
-      duration: 110,
-      onComplete: () => f.destroy(),
+      duration: dur,
+      ease: 'Cubic.easeOut',
+      onComplete: () => ring.destroy(),
+    });
+  }
+
+  // Squash on landing / stretch on jumping (scale-only so it doesn't fight the
+  // per-frame rotation the physics sets).
+  carSquash(sx, sy) {
+    if (!this.car) return;
+    if (this._squashTween) this._squashTween.stop(); // only the scale tween, not alpha/recoil
+    this.car.setScale(sx, sy);
+    this._squashTween = this.tweens.add({ targets: this.car, scaleX: 1, scaleY: 1, duration: 220, ease: 'Back.easeOut' });
+  }
+
+  // A small floating number/label that drifts up and fades (kill rewards, etc.).
+  floatNumber(x, y, text, color = '#ffe14d', size = 22) {
+    const t = this.add
+      .text(x, y, text, { fontFamily: FONTS.display, fontSize: `${size}px`, color, stroke: '#1b1d2a', strokeThickness: 4 })
+      .setOrigin(0.5)
+      .setDepth(23);
+    this.tweens.add({
+      targets: t,
+      y: y - 38,
+      alpha: { from: 1, to: 0 },
+      scale: { from: 0.6, to: 1.1 },
+      duration: 700,
+      ease: 'Quad.easeOut',
+      onComplete: () => t.destroy(),
     });
   }
 
