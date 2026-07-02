@@ -15,6 +15,8 @@ function freshDefault() {
     unlockedParts: [], // special boss-drop parts that gate some upgrades
     turrets: 0, // bolt-on top turrets earned from mega enemies
     muted: false,
+    musicVol: 0.6, // 0..1 background-music volume
+    sfxVol: 0.9, // 0..1 sound-effects volume
     littleKid: false, // invincible mode for young players
     // Freestyle bonus-round arsenal — accumulates and persists across replays.
     freestyle: freshFreestyle(),
@@ -110,6 +112,14 @@ export const Player = {
 
   setMuted(m) {
     data.muted = m;
+    this.save();
+  },
+  setMusicVol(v) {
+    data.musicVol = Math.max(0, Math.min(1, v));
+    this.save();
+  },
+  setSfxVol(v) {
+    data.sfxVol = Math.max(0, Math.min(1, v));
     this.save();
   },
 

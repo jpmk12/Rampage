@@ -145,6 +145,14 @@ audio still generated in code, no binary assets.
   scrolling **biome props** (leafy trees, dead trees, cacti, snowy pines,
   volcanic rocks) give each land real depth, and ground enemies cast **contact
   shadows**.
+- **Dynamic audio:** every biome has its **own music theme** (bright Greenwood,
+  spooky Zombie Flats, western Badlands, airy Frost, driving Volcano, plus a
+  party track for Freestyle), now with a **drum groove** that **ramps up for
+  boss fights and again on your last heart**. Music and effects run on separate
+  buses through a limiter; SFX are pitch-varied so they don't fatigue, with new
+  cues for combos, weak-point crits, and boss entrances. A **⚙ Settings** panel
+  (on the title and pause menus) gives independent **Music / SFX volume** and a
+  sound toggle, all saved.
 
 **Polish & shell (done):** a **title screen** (your current car idling on an
 animated landscape) with **PLAY**, **⚡ Freestyle**, a **Kid Mode** toggle, and —

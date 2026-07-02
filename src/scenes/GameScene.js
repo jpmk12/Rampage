@@ -124,16 +124,18 @@ export default class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.bullets, this.enemyShots, this.onShootRock, null, this);
     this.physics.add.overlap(this.bullets, this.bosses, this.onBulletHitBoss, null, this);
 
-    // audio: start the loop, and stop it when the scene shuts down/restarts
-    sound.setMuted(Player.state.muted);
-    sound.startMusic();
+    // audio: start this biome's theme, and stop it on shutdown/restart
+    this.musicTheme = this.freestyle ? 'free' : this.levelId;
+    this.syncAudio();
+    sound.startMusic(this.musicTheme);
     this.events.once('shutdown', () => sound.stopMusic());
     this.events.once('destroy', () => sound.stopMusic());
     // pause/resume music with the scene (pause menu)
     this.events.on('pause', () => sound.stopMusic());
     this.events.on('resume', () => {
-      sound.setMuted(Player.state.muted);
-      sound.startMusic();
+      this.syncAudio();
+      sound.startMusic(this.musicTheme);
+      this.refreshIntensity();
     });
 
     this.buildWeather();
@@ -522,6 +524,23 @@ export default class GameScene extends Phaser.Scene {
     sound.setMuted(m);
     if (!m) sound.resume();
     this.muteBtn.setText(m ? '🔇' : '🔊');
+  }
+
+  // push the saved audio preferences into the sound engine
+  syncAudio() {
+    sound.setMuted(Player.state.muted);
+    sound.setMusicVol(Player.state.musicVol);
+    sound.setSfxVol(Player.state.sfxVol);
+  }
+
+  // 0 normal, 1 boss fight, 2 danger (low health) — drives the music energy
+  musicIntensity() {
+    if (this.health <= 1 && this.state === 'playing' && !Player.state.littleKid) return 2;
+    if (this.boss) return 1;
+    return 0;
+  }
+  refreshIntensity() {
+    sound.setIntensity(this.musicIntensity());
   }
 
   pauseGame() {
@@ -974,6 +993,7 @@ export default class GameScene extends Phaser.Scene {
       this.maxHealth += 1;
       this.health = this.maxHealth;
       this.rebuildHearts();
+      this.refreshIntensity();
     } else if (['guns', 'spread', 'rockets', 'missiles', 'bombs'].includes(pk.type)) {
       this.refreshFreestyleCar();
     }
@@ -1442,6 +1462,7 @@ export default class GameScene extends Phaser.Scene {
     this.renderHearts();
     if (this.combo > 2) this.floatNumber(this.car.x, this.car.y - 90, 'COMBO LOST', '#ff7a7a', 16);
     this.resetCombo(); // a hit breaks the streak
+    this.refreshIntensity(); // ramp music up if we're now on our last heart
 
     // blink the car while invulnerable
     this.tweens.add({
@@ -1615,6 +1636,8 @@ export default class GameScene extends Phaser.Scene {
     b.setData('tellUntil', 0);
     b.setData('flashUntil', 0);
     this.boss = b;
+    sound.bossAppear();
+    this.refreshIntensity();
 
     this.showBossBar(spec.name);
     this.tweens.add({
@@ -1774,6 +1797,7 @@ export default class GameScene extends Phaser.Scene {
     if (crit) {
       dmg *= 2;
       this.spark(boss.x, boss.y - boss.displayHeight * 0.5, 0xffe14d);
+      sound.crit();
     }
     const hp = boss.getData('hp') - dmg;
     boss.setData('hp', Math.max(0, hp));
@@ -1794,6 +1818,7 @@ export default class GameScene extends Phaser.Scene {
     boss.destroy();
     this.boss = null;
     this.hideBossBar();
+    this.refreshIntensity();
     sound.explode();
     // a punchy multi-ring blast + white camera flash to sell the kill
     this.shockRing(bx, by, 0xfff2b0, 150, 420);
@@ -2051,6 +2076,7 @@ export default class GameScene extends Phaser.Scene {
     this.comboText.setColor(tiers[m] || '#ff5d4d');
     this.comboText.setAlpha(1);
     this.comboText.setScale(1.3);
+    sound.combo(m);
     this.tweens.killTweensOf(this.comboText);
     this.tweens.add({ targets: this.comboText, scale: 1, duration: 180, ease: 'Back.easeOut' });
   }

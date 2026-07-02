@@ -40,6 +40,15 @@ export default class PauseScene extends Phaser.Scene {
       this.scene.start('Title');
     });
 
+    // settings gear (top-right of the panel) — opens the audio overlay
+    this.add
+      .text(cx + 158, cy - 116, '⚙', { fontSize: '28px' })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerover', function () { this.setScale(1.15); })
+      .on('pointerout', function () { this.setScale(1); })
+      .on('pointerdown', () => this.scene.launch('Settings', { from: 'Pause' }));
+
     // Esc / P also resumes
     this.input.keyboard.on('keydown-ESC', this.resume, this);
     this.input.keyboard.on('keydown-P', this.resume, this);

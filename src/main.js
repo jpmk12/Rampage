@@ -1,11 +1,13 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT } from './config.js';
 import { Player } from './state/PlayerState.js';
+import { sound } from './audio/Sound.js';
 import BootScene from './scenes/BootScene.js';
 import TitleScene from './scenes/TitleScene.js';
 import GameScene from './scenes/GameScene.js';
 import GarageScene from './scenes/GarageScene.js';
 import PauseScene from './scenes/PauseScene.js';
+import SettingsScene from './scenes/SettingsScene.js';
 
 const config = {
   type: Phaser.AUTO,
@@ -32,7 +34,7 @@ const config = {
       debug: false,
     },
   },
-  scene: [BootScene, TitleScene, GameScene, GarageScene, PauseScene],
+  scene: [BootScene, TitleScene, GameScene, GarageScene, PauseScene, SettingsScene],
 };
 
 // Wait for the display fonts to load before booting, so Phaser renders text
@@ -51,6 +53,11 @@ async function boot() {
   } catch (e) {
     /* fall back to system-ui */
   }
+
+  // apply saved audio preferences to the shared sound engine up front
+  sound.setMusicVol(Player.state.musicVol);
+  sound.setSfxVol(Player.state.sfxVol);
+  sound.setMuted(Player.state.muted);
 
   const game = new Phaser.Game(config);
 

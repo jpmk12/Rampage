@@ -22,7 +22,9 @@ export default class TitleScene extends Phaser.Scene {
     this.input.once('pointerdown', () => {
       sound.resume();
       sound.setMuted(Player.state.muted);
-      sound.startMusic();
+      sound.setMusicVol(Player.state.musicVol);
+      sound.setSfxVol(Player.state.sfxVol);
+      sound.startMusic('title');
     });
 
     this.cameras.main.fadeIn(400, 27, 29, 42);
@@ -165,6 +167,18 @@ export default class TitleScene extends Phaser.Scene {
   }
 
   buildMute() {
+    // settings gear (opens the audio settings overlay)
+    this.add
+      .text(GAME_WIDTH - 76, 34, '⚙', { fontSize: '26px' })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerover', function () { this.setScale(1.15); })
+      .on('pointerout', function () { this.setScale(1); })
+      .on('pointerdown', () => {
+        sound.resume();
+        this.scene.launch('Settings', { from: 'Title' });
+      });
+
     this.muteBtn = this.add
       .text(GAME_WIDTH - 34, 34, Player.state.muted ? '🔇' : '🔊', { fontSize: '26px' })
       .setOrigin(0.5)
@@ -175,7 +189,7 @@ export default class TitleScene extends Phaser.Scene {
       sound.setMuted(m);
       if (!m) {
         sound.resume();
-        sound.startMusic();
+        sound.startMusic('title');
       }
       this.muteBtn.setText(m ? '🔇' : '🔊');
     });
