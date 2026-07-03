@@ -18,6 +18,7 @@ import { Player } from '../state/PlayerState.js';
 import { getBody, getWeapon } from '../data/catalog.js';
 import { ENEMY_TYPES, pickEnemyType, pickEnemyForLevel } from '../data/enemies.js';
 import { pickPickup } from '../data/freestyle.js';
+import { POWERUPS, pickPowerup } from '../data/powerups.js';
 import { getLevel, LAST_LEVEL } from '../data/levels.js';
 import { buildCar, muzzleFor, addTurret } from '../entities/Car.js';
 import { sound } from '../audio/Sound.js';
@@ -108,6 +109,12 @@ export default class GameScene extends Phaser.Scene {
     this.invulnUntil = 0;
     this.combo = 0;
     this.comboUntil = 0;
+    this.lastRewardMult = 1; // combo milestones already rewarded this streak
+    this.fx = {}; // timed power-up expiries: rapid/spread/magnet → timestamp
+    this.shieldHits = 0;
+    this.shieldBubble = null;
+    this.supplyAt = [0.34, 0.67]; // level progress marks for supply drops
+    this.supplyIdx = 0;
 
     this.spawnGap = Math.max(420, ENEMY.spawnEveryMin - (this.level - 1) * 70);
 
@@ -427,6 +434,11 @@ export default class GameScene extends Phaser.Scene {
     for (let i = 0; i < this.maxHealth; i++) {
       this.hearts.push(this.add.image(28 + i * 30, 84, 'heart').setDepth(20));
     }
+
+    // active power-up chips (⚡7  ◣3  🛡), under the hearts
+    this.fxText = this.add
+      .text(16, 102, '', { fontFamily: FONTS.ui, fontSize: '16px', color: '#bfe6ff', stroke: '#1b1d2a', strokeThickness: 3 })
+      .setDepth(20);
     if (Player.state.littleKid) {
       this.add
         .text(28 + this.maxHealth * 30, 72, '👶 KID MODE', {
@@ -581,6 +593,7 @@ export default class GameScene extends Phaser.Scene {
       }
       this.emitDust(time);
       if (this.combo > 0 && time > this.comboUntil) this.resetCombo();
+      this.updatePowerups(time);
     }
     this.updateClouds(delta);
     this.updateCarPhysics(delta);
@@ -648,6 +661,10 @@ export default class GameScene extends Phaser.Scene {
     this.distance += WORLD_SCROLL * delta;
     const p = Phaser.Math.Clamp(this.distance / LEVEL.length, 0, 1);
     this.progressFill.width = 4 + p * 252;
+    if (this.supplyIdx < this.supplyAt.length && p >= this.supplyAt[this.supplyIdx]) {
+      this.supplyIdx += 1;
+      this.startSupplyDrop();
+    }
     if (this.distance >= LEVEL.length) this.startHorde();
   }
 
@@ -834,11 +851,12 @@ export default class GameScene extends Phaser.Scene {
     // the surplus turns into extra damage so the screen doesn't refill.
     const frEff = Math.min(FIRE_RATE_CAP, f.fireRate || 0);
     const frOver = Math.max(0, (f.fireRate || 0) - FIRE_RATE_CAP);
-    const rate = 1 / (1 + 0.14 * frEff);
+    let rate = 1 / (1 + 0.14 * frEff);
+    if (this.fxActive('rapid')) rate *= 0.55; // timed rapid-fire boost
     const base = (1 + (f.power || 0)) * (1 + frOver * FIRE_RATE_OVER_DMG);
     let fired = false;
 
-    const gN = this.fsCount('guns');
+    const gN = this.fsCount('guns') + (this.fxActive('spread') ? 2 : 0);
     if (gN > 0 && time - (this.tGun || 0) > 170 * rate) {
       this.tGun = time;
       const dmg = base * this.fsBoost('guns');
@@ -949,6 +967,7 @@ export default class GameScene extends Phaser.Scene {
     return best;
   }
 
+  // Freestyle permanent-arsenal crate (unchanged behaviour).
   dropPickup(x, y) {
     const pk = pickPickup(Math.random);
     const c = this.pickups.create(x, Math.min(y, GROUND_TOP_Y - 20), 'crate');
@@ -956,33 +975,136 @@ export default class GameScene extends Phaser.Scene {
     c.setData('pk', pk);
   }
 
+  // A TIMED power-up crate (both modes): combo rewards + rare campaign drops.
+  dropTimedCrate(x, y, pu) {
+    pu = pu || pickPowerup(Math.random);
+    const c = this.pickups.create(x, Math.min(y, GROUND_TOP_Y - 20), 'crate');
+    c.setTint(pu.tint).setScale(1.1).setDepth(5);
+    c.setData('pu', pu);
+    this.attachCrateLabel(c, pu.icon);
+    return c;
+  }
+
+  attachCrateLabel(c, icon) {
+    const lbl = this.add
+      .text(c.x, c.y - 32, icon, { fontSize: '18px' })
+      .setOrigin(0.5)
+      .setDepth(6);
+    c.setData('lbl', lbl);
+  }
+
+  destroyPickup(p) {
+    const lbl = p.getData('lbl');
+    if (lbl) lbl.destroy();
+    const chute = p.getData('chute');
+    if (chute) chute.destroy();
+    p.destroy();
+  }
+
+  // ---- supply drop: three crates parachute in, you may grab only ONE -------
+
+  startSupplyDrop() {
+    this.bannerFlash('📦  SUPPLY DROP — grab ONE!', '#bfe6ff');
+    sound.powerup();
+    const keys = Phaser.Utils.Array.Shuffle(Object.keys(POWERUPS)).slice(0, 3);
+    keys.forEach((k, i) => this.spawnSupplyCrate(POWERUPS[k], GAME_WIDTH - 320 + i * 180, i));
+  }
+
+  spawnSupplyCrate(pu, x, i) {
+    const p = this.pickups.create(x, -30 - i * 46, 'crate');
+    p.setTint(pu.tint).setScale(1.25).setDepth(5);
+    p.setData('pu', pu);
+    p.setData('supply', true);
+    p.setData('fall', true);
+    p.setData('vy', 0.3);
+    p.setData('landY', GROUND_TOP_Y - 16);
+    const chute = this.add.image(x, p.y - 34, 'chute').setDepth(5);
+    p.setData('chute', chute);
+    this.attachCrateLabel(p, pu.icon);
+  }
+
+  // Once one supply crate is taken, the rest balloon away — you chose.
+  dismissOtherSupplies() {
+    this.pickups.children.iterate((o) => {
+      if (o && o.getData('supply') && !o.getData('dead')) {
+        o.setData('dead', true);
+        const bits = [o, o.getData('lbl'), o.getData('chute')].filter(Boolean);
+        this.tweens.add({
+          targets: bits,
+          y: '-=140',
+          alpha: 0,
+          duration: 450,
+          ease: 'Quad.easeIn',
+          onComplete: () => bits.forEach((b) => b.destroy()),
+        });
+      }
+      return true;
+    });
+  }
+
   updatePickups(delta) {
-    if (!this.freestyle) return;
     const cx = this.car.x;
     const cy = this.carCenterY();
     this.pickups.children.iterate((p) => {
-      if (!p) return true;
-      const d = Phaser.Math.Distance.Between(p.x, p.y, cx, cy);
-      if (d < 46) {
+      if (!p || p.getData('dead')) return true;
+      const supply = p.getData('supply');
+
+      if (p.getData('fall')) {
+        // parachuting in: drift down with the world scroll
+        p.y += p.getData('vy') * delta;
+        p.x -= WORLD_SCROLL * delta;
+        if (p.y >= p.getData('landY')) {
+          p.y = p.getData('landY');
+          p.setData('fall', false);
+          const chute = p.getData('chute');
+          if (chute) {
+            p.setData('chute', null);
+            this.tweens.add({ targets: chute, alpha: 0, y: chute.y - 20, duration: 260, onComplete: () => chute.destroy() });
+          }
+        }
+      } else {
+        const d = Phaser.Math.Distance.Between(p.x, p.y, cx, cy);
+        // supply crates never home — you must drive into (or jump over) them
+        if (!supply && d < (this.fxActive('magnet') ? 520 : 240)) {
+          const k = Math.min(1, 0.02 * delta);
+          p.x += (cx - p.x) * k;
+          p.y += (cy - p.y) * k;
+        } else {
+          p.x -= WORLD_SCROLL * delta;
+        }
+        if (!supply) p.rotation += 0.004 * delta;
+      }
+
+      // attachments follow the crate
+      const chute = p.getData('chute');
+      if (chute) chute.setPosition(p.x, p.y - 34);
+      const lbl = p.getData('lbl');
+      if (lbl) lbl.setPosition(p.x, p.y - 32);
+
+      if (this.state === 'playing' && Phaser.Math.Distance.Between(p.x, p.y, cx, cy) < 48) {
         this.collectPickup(p);
         return true;
       }
-      if (d < 240) {
-        const k = Math.min(1, 0.02 * delta);
-        p.x += (cx - p.x) * k;
-        p.y += (cy - p.y) * k;
-      } else {
-        p.x -= WORLD_SCROLL * delta;
-      }
-      p.rotation += 0.004 * delta;
-      if (p.x < -40) p.destroy();
+      if (p.x < -40) this.destroyPickup(p);
       return true;
     });
   }
 
   collectPickup(p) {
+    // timed power-up crate (campaign drops, combo rewards, supply drops)
+    const pu = p.getData('pu');
+    if (pu) {
+      const supply = p.getData('supply');
+      this.destroyPickup(p);
+      if (supply) this.dismissOtherSupplies();
+      sound.pickup();
+      this.applyPowerup(pu);
+      return;
+    }
+
+    // freestyle permanent-arsenal crate
     const pk = p.getData('pk');
-    p.destroy();
+    this.destroyPickup(p);
     Player.upgradeFreestyle(pk.type);
     this.fs = Player.freestyle;
     sound.pickup();
@@ -997,6 +1119,73 @@ export default class GameScene extends Phaser.Scene {
     } else if (['guns', 'spread', 'rockets', 'missiles', 'bombs'].includes(pk.type)) {
       this.refreshFreestyleCar();
     }
+  }
+
+  // ---- timed power-up effects ---------------------------------------------
+
+  fxActive(type) {
+    return this.time.now < (this.fx[type] || 0);
+  }
+
+  applyPowerup(pu) {
+    const kid = Player.state.littleKid ? 1.5 : 1; // little kids keep boosts longer
+    sound.powerup();
+    const color = '#' + pu.tint.toString(16).padStart(6, '0');
+    this.floatLabel(this.car.x, this.car.y - 96, pu.label, color);
+
+    if (pu.type === 'heal') {
+      if (this.health < this.maxHealth) {
+        this.health += 1;
+        this.renderHearts();
+        this.refreshIntensity();
+      } else if (this.freestyle) {
+        this.score += 2;
+        this.scoreText.setText('SCORE ' + this.score);
+      } else {
+        Player.state.scrap += 4;
+        this.scrapText.setText(String(Player.state.scrap));
+        this.floatNumber(this.car.x + 60, this.car.y - 70, '+4', '#ffe14d', 18);
+      }
+    } else if (pu.type === 'shield') {
+      this.shieldHits = 1;
+      if (!this.shieldBubble) {
+        this.shieldBubble = this.add
+          .circle(this.car.x, this.carCenterY(), 62, 0x7fd4ff, 0.1)
+          .setStrokeStyle(3, 0x7fd4ff, 0.95)
+          .setDepth(6);
+      }
+    } else {
+      this.fx[pu.type] = this.time.now + pu.dur * kid;
+    }
+    this.refreshFxText();
+  }
+
+  updatePowerups(time) {
+    if (this.shieldBubble) {
+      if (this.shieldHits <= 0) {
+        this.shieldBubble.destroy();
+        this.shieldBubble = null;
+      } else {
+        this.shieldBubble.setPosition(this.car.x, this.carCenterY());
+      }
+    }
+    if (time - (this._fxTextAt || 0) > 250) {
+      this._fxTextAt = time;
+      this.refreshFxText();
+    }
+  }
+
+  refreshFxText() {
+    if (!this.fxText) return;
+    const now = this.time.now;
+    const icons = { rapid: '⚡', spread: '◣', magnet: '🧲' };
+    const parts = [];
+    for (const k of Object.keys(icons)) {
+      const left = (this.fx[k] || 0) - now;
+      if (left > 0) parts.push(`${icons[k]}${Math.ceil(left / 1000)}`);
+    }
+    if (this.shieldHits > 0) parts.push('🛡');
+    this.fxText.setText(parts.join('   '));
   }
 
   floatLabel(x, y, text, color) {
@@ -1357,6 +1546,17 @@ export default class GameScene extends Phaser.Scene {
     // every kill builds the streak multiplier
     const mult = this.bumpCombo();
 
+    // hitting a new combo tier (x3, x5) drops a guaranteed power-up crate
+    if (mult >= 3 && this.lastRewardMult < 3) {
+      this.lastRewardMult = 3;
+      this.dropTimedCrate(gx, yy - 10);
+      this.floatNumber(gx, yy - 44, 'COMBO PRIZE!', '#ffb04a', 16);
+    } else if (mult >= 5 && this.lastRewardMult < 5) {
+      this.lastRewardMult = 5;
+      this.dropTimedCrate(gx, yy - 10);
+      this.floatNumber(gx, yy - 44, 'MEGA COMBO PRIZE!', '#ff8a3a', 16);
+    }
+
     if (this.freestyle) {
       const gained = (type.mega ? 5 : 1) * mult;
       this.score += gained;
@@ -1374,6 +1574,8 @@ export default class GameScene extends Phaser.Scene {
     for (let i = 0; i < pieces; i++) {
       this.spawnScrap(gx + Phaser.Math.Between(-14, 14), yy + Phaser.Math.Between(-8, 8));
     }
+    // campaign enemies occasionally drop a timed power-up crate
+    if (!type.mega && Math.random() < 0.08) this.dropTimedCrate(gx, yy - 10);
     if (mult > 1) this.floatNumber(gx, yy - 20, `x${mult}!`, mult >= 3 ? '#ff8a3a' : '#ffd34d', 22);
     if (goblin.getData('horde')) {
       this.hordeDefeated += 1;
@@ -1456,6 +1658,17 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
+    // a shield bubble soaks the hit — and keeps the combo streak alive
+    if (this.shieldHits > 0) {
+      this.shieldHits -= 1;
+      sound.shieldBlock();
+      this.poof(this.car.x + 12, this.carCenterY(), 0x7fd4ff);
+      this.shockRing(this.car.x, this.carCenterY(), 0x7fd4ff, 80, 280);
+      this.floatNumber(this.car.x, this.car.y - 96, 'BLOCKED!', '#7fd4ff', 18);
+      this.refreshFxText();
+      return;
+    }
+
     this.health -= amount;
     this.hurtFlash.setAlpha(0.4);
     this.tweens.add({ targets: this.hurtFlash, alpha: 0, duration: 320 });
@@ -1495,6 +1708,10 @@ export default class GameScene extends Phaser.Scene {
   updateScraps(delta) {
     const cx = this.car.x;
     const cy = this.carCenterY();
+    // scrap-magnet power-up: hoover the whole screen, and faster
+    const magnet = this.fxActive('magnet');
+    const range = magnet ? 900 : SCRAP.magnetRange;
+    const lerp = magnet ? SCRAP.homeLerp * 2.4 : SCRAP.homeLerp;
     this.scraps.children.iterate((s) => {
       if (!s) return true;
       const dist = Phaser.Math.Distance.Between(s.x, s.y, cx, cy);
@@ -1502,8 +1719,8 @@ export default class GameScene extends Phaser.Scene {
         this.collectScrap(s);
         return true;
       }
-      if (dist < SCRAP.magnetRange) {
-        const k = Math.min(1, SCRAP.homeLerp * delta);
+      if (dist < range) {
+        const k = Math.min(1, lerp * delta);
         s.x += (cx - s.x) * k;
         s.y += (cy - s.y) * k;
       } else {
@@ -1984,21 +2201,21 @@ export default class GameScene extends Phaser.Scene {
   // ---- shooting ---------------------------------------------------------
 
   handleFiring(time) {
-    if (time - this.lastFireAt < this.weapon.cooldown) return;
+    // rapid-fire power-up more than doubles the fire rate
+    const cd = this.weapon.cooldown * (this.fxActive('rapid') ? 0.45 : 1);
+    if (time - this.lastFireAt < cd) return;
     this.lastFireAt = time;
 
     const m = muzzleFor(this.car, this.aim);
     const mx = this.car.x + m.x;
     const my = this.car.y + m.y;
 
-    const shot = this.bullets.create(mx, my, this.weapon.shot);
-    shot.setScale(this.weapon.shotScale || 1);
-    shot.setRotation(this.aim);
-    shot.body.setAllowGravity(false);
-    shot.setVelocity(Math.cos(this.aim) * this.weapon.speed, Math.sin(this.aim) * this.weapon.speed);
-    shot.setData('dmg', this.weapon.damage);
-    if (this.weapon.splash) shot.setData('splash', this.weapon.splash);
-    if (this.weapon.pierce) shot.setData('pierce', this.weapon.pierce);
+    this.firePlayerShot(mx, my, this.aim);
+    if (this.fxActive('spread')) {
+      // triple-shot power-up fans two extra shots
+      this.firePlayerShot(mx, my, this.aim - 0.16);
+      this.firePlayerShot(mx, my, this.aim + 0.16);
+    }
     sound.shoot();
     this.muzzleFlash(mx, my);
 
@@ -2008,6 +2225,20 @@ export default class GameScene extends Phaser.Scene {
       duration: 90,
       ease: 'Quad.easeOut',
     });
+  }
+
+  // One shot from the equipped weapon at the given angle, carrying its
+  // damage/splash/pierce behaviour.
+  firePlayerShot(mx, my, angle) {
+    const shot = this.bullets.create(mx, my, this.weapon.shot);
+    shot.setScale(this.weapon.shotScale || 1);
+    shot.setRotation(angle);
+    shot.body.setAllowGravity(false);
+    shot.setVelocity(Math.cos(angle) * this.weapon.speed, Math.sin(angle) * this.weapon.speed);
+    shot.setData('dmg', this.weapon.damage);
+    if (this.weapon.splash) shot.setData('splash', this.weapon.splash);
+    if (this.weapon.pierce) shot.setData('pierce', this.weapon.pierce);
+    return shot;
   }
 
   // ---- game feel / juice -----------------------------------------------
@@ -2083,6 +2314,7 @@ export default class GameScene extends Phaser.Scene {
 
   resetCombo() {
     this.combo = 0;
+    this.lastRewardMult = 1;
     if (this.comboText) {
       this.tweens.killTweensOf(this.comboText);
       this.tweens.add({ targets: this.comboText, alpha: 0, duration: 220 });

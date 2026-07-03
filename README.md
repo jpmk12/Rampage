@@ -145,6 +145,14 @@ audio still generated in code, no binary assets.
   scrolling **biome props** (leafy trees, dead trees, cacti, snowy pines,
   volcanic rocks) give each land real depth, and ground enemies cast **contact
   shadows**.
+- **Mid-level power-ups:** the campaign now has live vehicle power during the
+  run, not just at the Garage. Twice per level a **📦 Supply Drop** parachutes
+  in **three crates — you can only grab ONE** (drive into it, or jump to pass it
+  up): ⚡ Rapid Fire, ◣ Triple Shot, 🛡 Shield, 🧲 Scrap Magnet, ❤ Heal. Enemies
+  also rarely drop crates, and hitting **combo x3 / x5 earns a guaranteed prize
+  crate** — so skilled streaks now pay off in firepower. Boosts are **temporary**
+  (timers show as chips under your hearts; longer in Kid Mode), the Shield soaks
+  a hit **without breaking your combo**, and the Garage economy stays intact.
 - **Dynamic audio:** every biome has its **own music theme** (bright Greenwood,
   spooky Zombie Flats, western Badlands, airy Frost, driving Volcano, plus a
   party track for Freestyle), now with a **drum groove** that **ramps up for

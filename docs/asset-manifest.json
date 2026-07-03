@@ -7,8 +7,8 @@
     "4": "Frostbite Peaks",
     "5": "Volcano Fortress"
   },
-  "count": 97,
-  "groups": 49,
+  "count": 98,
+  "groups": 50,
   "assets": [
     {
       "key": "body-cardboard",
@@ -1052,7 +1052,19 @@
       "facing": null,
       "tiles": false,
       "tinted": true,
-      "desc": "freestyle power-up crate (tinted per pickup — supply white)"
+      "desc": "power-up crate, freestyle + campaign (tinted per pickup — supply white)"
+    },
+    {
+      "key": "chute",
+      "file": "chute.png",
+      "w": 44,
+      "h": 30,
+      "anchor": "center",
+      "group": "Pickups & UI",
+      "facing": null,
+      "tiles": false,
+      "tinted": false,
+      "desc": "supply-drop parachute canopy (pops on landing)"
     },
     {
       "key": "flag",

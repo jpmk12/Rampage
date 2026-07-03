@@ -189,6 +189,15 @@ class Sound {
     this.tone(1200, 0.08, 'square', 0.12, 400);
     this.noise(0.06, 0.06);
   }
+  // cheerful rising arpeggio when a power-up kicks in
+  powerup() {
+    [660, 880, 1174].forEach((f, i) => setTimeout(() => this.tone(f, 0.09, 'triangle', 0.14), i * 70));
+  }
+  // metallic clank when the shield soaks a hit
+  shieldBlock() {
+    this.tone(240, 0.12, 'square', 0.16, 180);
+    this.noise(0.08, 0.08);
+  }
   // low menacing horn when a boss rolls in
   bossAppear() {
     this.tone(110, 0.5, 'sawtooth', 0.2, 82);

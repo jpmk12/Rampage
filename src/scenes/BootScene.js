@@ -79,6 +79,7 @@ export default class BootScene extends Phaser.Scene {
     this.makeSun('sun');
     this.makeFlake('flake');
     this.makeCrate('crate');
+    this.makeChute('chute');
     this.makeHeart('heart', true);
     this.makeHeart('heart-empty', false);
     this.makeDrummer('drummer');
@@ -1100,6 +1101,47 @@ export default class BootScene extends Phaser.Scene {
     g.fillStyle(0x000000, 0.25);
     g.fillPath();
     g.generateTexture(key, S, S);
+    g.destroy();
+  }
+
+  // Red-and-white supply parachute canopy with strings, drawn above a falling
+  // supply crate and popped when it lands.
+  makeChute(key) {
+    if (this.textures.exists(key)) return;
+    const W = 44;
+    const H = 30;
+    const g = this.add.graphics();
+    // strings down to where the crate hangs
+    g.lineStyle(2, 0x3a3f47, 0.9);
+    [[4, 16], [22, 18], [40, 16]].forEach(([x, y]) => {
+      g.beginPath();
+      g.moveTo(x, y);
+      g.lineTo(22, 30);
+      g.strokePath();
+    });
+    // canopy (red half-dome with white panels)
+    g.fillStyle(0xe2483a, 1);
+    g.beginPath();
+    g.arc(22, 17, 20, Math.PI, 0, false);
+    g.closePath();
+    g.fillPath();
+    g.fillStyle(0xffffff, 0.9);
+    g.beginPath();
+    g.arc(22, 17, 20, Math.PI * 1.25, Math.PI * 1.45, false);
+    g.arc(22, 17, 1, 0, Math.PI * 2, false);
+    g.closePath();
+    g.fillPath();
+    g.beginPath();
+    g.arc(22, 17, 20, Math.PI * 1.62, Math.PI * 1.82, false);
+    g.arc(22, 17, 1, 0, Math.PI * 2, false);
+    g.closePath();
+    g.fillPath();
+    // rim highlight
+    g.lineStyle(2, 0x9c2a20, 1);
+    g.beginPath();
+    g.arc(22, 17, 20, Math.PI, 0, false);
+    g.strokePath();
+    g.generateTexture(key, W, H);
     g.destroy();
   }
 
