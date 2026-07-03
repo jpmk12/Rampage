@@ -110,6 +110,7 @@ export default class GameScene extends Phaser.Scene {
     this.combo = 0;
     this.comboUntil = 0;
     this.lastRewardMult = 1; // combo milestones already rewarded this streak
+    this.radioItems = null; // Bolt's Radio buttons (campaign only)
     this.fx = {}; // timed power-up expiries: rapid/spread/magnet → timestamp
     this.shieldHits = 0;
     this.shieldBubble = null;
@@ -388,6 +389,7 @@ export default class GameScene extends Phaser.Scene {
     this.input.on('pointerdown', (p) => {
       if (this.muteHit(p)) return;
       if (this.odHit(p)) return;
+      if (this.radioHit(p)) return;
       if (this.state === 'over') {
         // freestyle shows its own buttons; campaign game-over restarts on tap
         if (this.freestyle) return;
@@ -484,6 +486,7 @@ export default class GameScene extends Phaser.Scene {
         .setOrigin(0, 0.5)
         .setDepth(20);
       this.add.image(GAME_WIDTH / 2 + 132, 24, 'flag').setScale(0.18).setDepth(20);
+      this.buildRadio();
     }
 
     // kill-combo readout (hidden until a streak builds)
@@ -1203,7 +1206,7 @@ export default class GameScene extends Phaser.Scene {
   refreshFxText() {
     if (!this.fxText) return;
     const now = this.time.now;
-    const icons = { rapid: '⚡', spread: '◣', magnet: '🧲' };
+    const icons = { rapid: '⚡', spread: '◣', magnet: '🧲', damage: '💥' };
     const parts = [];
     for (const k of Object.keys(icons)) {
       const left = (this.fx[k] || 0) - now;
@@ -1211,6 +1214,75 @@ export default class GameScene extends Phaser.Scene {
     }
     if (this.shieldHits > 0) parts.push('🛡');
     this.fxText.setText(parts.join('   '));
+  }
+
+  // ---- Bolt's Field Radio: spend scrap mid-run (campaign only) ------------
+
+  buildRadio() {
+    this.radioItems = [
+      { key: 'heal', label: '❤ Heal', cost: 6, y: GAME_HEIGHT - 108 },
+      { key: 'boost', label: '💥 Boost 15s', cost: 10, y: GAME_HEIGHT - 70 },
+    ];
+    this.add
+      .text(GAME_WIDTH - 150, GAME_HEIGHT - 132, '📻 Bolt’s Radio', { fontFamily: FONTS.ui, fontSize: '12px', color: '#bfe6ff', stroke: '#1b1d2a', strokeThickness: 3 })
+      .setDepth(20)
+      .setAlpha(0.85);
+    for (const it of this.radioItems) {
+      const x = GAME_WIDTH - 84;
+      it.bg = this.add.rectangle(x, it.y, 148, 32, 0x2c3142, 0.95).setStrokeStyle(2, 0x4a78c0).setDepth(20);
+      it.txt = this.add
+        .text(x, it.y, `${it.label}  (${it.cost})`, { fontFamily: FONTS.ui, fontSize: '14px', color: '#ffffff', stroke: '#1b1d2a', strokeThickness: 2 })
+        .setOrigin(0.5)
+        .setDepth(21);
+    }
+    this.refreshRadio();
+  }
+
+  refreshRadio() {
+    if (!this.radioItems) return;
+    for (const it of this.radioItems) {
+      const full = it.key === 'heal' && this.health >= this.maxHealth;
+      const afford = Player.state.scrap >= it.cost && !full;
+      it.bg.setStrokeStyle(2, afford ? 0x6fd06a : 0x4a4f57);
+      it.txt.setColor(afford ? '#ffffff' : '#8a8f98');
+      it.bg.setAlpha(afford ? 0.95 : 0.5);
+      it.txt.setText(full ? `${it.label}  (full)` : `${it.label}  (${it.cost})`);
+    }
+  }
+
+  // Swallow taps that hit a radio button (so they don't also jump the car).
+  radioHit(p) {
+    if (!this.radioItems || this.state !== 'playing') return false;
+    for (const it of this.radioItems) {
+      if (Math.abs(p.x - it.bg.x) < 76 && Math.abs(p.y - it.bg.y) < 18) {
+        this.buyRadio(it);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  buyRadio(it) {
+    if (it.key === 'heal' && this.health >= this.maxHealth) return;
+    if (!Player.spend(it.cost)) {
+      sound.hurt();
+      this.floatNumber(it.bg.x, it.bg.y - 22, 'Need more scrap', '#ff7a7a', 14);
+      this.tweens.add({ targets: it.bg, x: { from: it.bg.x - 4, to: it.bg.x }, duration: 60, yoyo: true, repeat: 2 });
+      return;
+    }
+    this.scrapText.setText(String(Player.state.scrap));
+    sound.powerup();
+    if (it.key === 'heal') {
+      this.health += 1;
+      this.renderHearts();
+      this.refreshIntensity();
+      this.floatLabel(this.car.x, this.car.y - 96, '+1 ❤', '#ff6a7a');
+    } else {
+      this.fx.damage = this.time.now + 15000;
+      this.floatLabel(this.car.x, this.car.y - 96, 'DAMAGE BOOST!', '#ff7a3a');
+      this.refreshFxText();
+    }
+    this.refreshRadio();
   }
 
   // ---- OVERDRIVE ----------------------------------------------------------
@@ -1843,6 +1915,7 @@ export default class GameScene extends Phaser.Scene {
 
   renderHearts() {
     this.hearts.forEach((h, i) => h.setTexture(i < this.health ? 'heart' : 'heart-empty'));
+    this.refreshRadio();
   }
 
   // ---- scrap ------------------------------------------------------------
@@ -1894,6 +1967,7 @@ export default class GameScene extends Phaser.Scene {
     sound.pickup();
     Player.state.scrap += SCRAP.value;
     this.scrapText.setText(String(Player.state.scrap));
+    this.refreshRadio();
     this.tweens.add({
       targets: this.scrapText,
       scale: { from: 1.35, to: 1 },
@@ -2380,11 +2454,13 @@ export default class GameScene extends Phaser.Scene {
   // damage/splash/pierce behaviour.
   firePlayerShot(mx, my, angle) {
     const shot = this.bullets.create(mx, my, this.weapon.shot);
-    shot.setScale(this.weapon.shotScale || 1);
+    const boosted = this.fxActive('damage');
+    shot.setScale((this.weapon.shotScale || 1) * (boosted ? 1.25 : 1));
+    if (boosted) shot.setTint(0xff7a3a);
     shot.setRotation(angle);
     shot.body.setAllowGravity(false);
     shot.setVelocity(Math.cos(angle) * this.weapon.speed, Math.sin(angle) * this.weapon.speed);
-    shot.setData('dmg', this.weapon.damage);
+    shot.setData('dmg', this.weapon.damage * (boosted ? 2 : 1));
     if (this.weapon.splash) shot.setData('splash', this.weapon.splash);
     if (this.weapon.pierce) shot.setData('pierce', this.weapon.pierce);
     return shot;

@@ -153,6 +153,11 @@ audio still generated in code, no binary assets.
   crate** — so skilled streaks now pay off in firepower. Boosts are **temporary**
   (timers show as chips under your hearts; longer in Kid Mode), the Shield soaks
   a hit **without breaking your combo**, and the Garage economy stays intact.
+- **📻 Bolt's Field Radio:** scrap is now a live resource, not just an
+  end-of-level currency. Two buttons (bottom-right) let you spend mid-run:
+  **❤ Heal +1 (6 scrap)** or **💥 Damage Boost 15s (10 scrap)** — a real
+  tension between patching up now and saving for that next car in the Garage.
+  Buttons grey out when you can't afford them (or when you're already full).
 - **⚡ OVERDRIVE:** every defeat charges the meter at the bottom of the screen
   (streaks, megas, and bosses charge it faster). When it's full, **tap it (or
   press E)** to erupt for six seconds: invincible, guns at maximum speed, and a
