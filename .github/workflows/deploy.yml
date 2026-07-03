@@ -63,29 +63,40 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      # GitHub's Pages backend can stay "in progress" for a few minutes after a
+      # GitHub's Pages backend can stay "in progress" for several minutes after a
       # prior run reports success, which makes a fresh deploy fail with a 400
-      # "in progress deployment" error. So we retry a couple of times with a
-      # wait, which lets the previous deployment drain and self-heals.
+      # "in progress deployment" error (this happens when commits are pushed a
+      # few minutes apart). So we retry several times with escalating waits —
+      # ~6.5 min total — which lets the previous deployment drain and self-heals.
       - name: Deploy to GitHub Pages (attempt 1)
-        id: deployment
+        id: d1
         uses: actions/deploy-pages@v4
         continue-on-error: true
 
-      - name: Wait before retry
-        if: steps.deployment.outcome == 'failure'
-        run: sleep 90
+      - name: Wait before attempt 2
+        if: steps.d1.outcome == 'failure'
+        run: sleep 60
 
       - name: Deploy to GitHub Pages (attempt 2)
-        id: deployment2
-        if: steps.deployment.outcome == 'failure'
+        id: d2
+        if: steps.d1.outcome == 'failure'
         uses: actions/deploy-pages@v4
         continue-on-error: true
 
-      - name: Wait before final retry
-        if: steps.deployment.outcome == 'failure' && steps.deployment2.outcome == 'failure'
+      - name: Wait before attempt 3
+        if: steps.d1.outcome == 'failure' && steps.d2.outcome == 'failure'
         run: sleep 120
 
+      - name: Deploy to GitHub Pages (attempt 3)
+        id: d3
+        if: steps.d1.outcome == 'failure' && steps.d2.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      - name: Wait before final attempt
+        if: steps.d1.outcome == 'failure' && steps.d2.outcome == 'failure' && steps.d3.outcome == 'failure'
+        run: sleep 180
+
       - name: Deploy to GitHub Pages (final attempt)
-        if: steps.deployment.outcome == 'failure' && steps.deployment2.outcome == 'failure'
+        if: steps.d1.outcome == 'failure' && steps.d2.outcome == 'failure' && steps.d3.outcome == 'failure'
         uses: actions/deploy-pages@v4
