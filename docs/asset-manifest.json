@@ -7,8 +7,8 @@
     "4": "Frostbite Peaks",
     "5": "Volcano Fortress"
   },
-  "count": 98,
-  "groups": 50,
+  "count": 99,
+  "groups": 51,
   "assets": [
     {
       "key": "body-cardboard",
@@ -1065,6 +1065,18 @@
       "tiles": false,
       "tinted": false,
       "desc": "supply-drop parachute canopy (pops on landing)"
+    },
+    {
+      "key": "cage",
+      "file": "cage.png",
+      "w": 52,
+      "h": 52,
+      "anchor": "bottom",
+      "group": "Pickups & UI",
+      "facing": null,
+      "tiles": false,
+      "tinted": false,
+      "desc": "road-event cage with a trapped critter — shoot to free"
     },
     {
       "key": "flag",

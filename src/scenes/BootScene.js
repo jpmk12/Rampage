@@ -80,6 +80,7 @@ export default class BootScene extends Phaser.Scene {
     this.makeFlake('flake');
     this.makeCrate('crate');
     this.makeChute('chute');
+    this.makeCage('cage');
     this.makeHeart('heart', true);
     this.makeHeart('heart-empty', false);
     this.makeDrummer('drummer');
@@ -1142,6 +1143,36 @@ export default class BootScene extends Phaser.Scene {
     g.arc(22, 17, 20, Math.PI, 0, false);
     g.strokePath();
     g.generateTexture(key, W, H);
+    g.destroy();
+  }
+
+  // A little jail cage with a trapped critter peeking out — shoot it to free
+  // the critter for a bonus. Origin bottom-centre (sits on the road). 52x52.
+  makeCage(key) {
+    if (this.textures.exists(key)) return;
+    const S = 52;
+    const g = this.add.graphics();
+    // trapped critter (green blob with eyes)
+    g.fillStyle(0x74b13c, 1);
+    g.fillRoundedRect(12, 22, 28, 26, 8);
+    g.fillStyle(0xffffff, 1);
+    g.fillCircle(21, 30, 5);
+    g.fillCircle(33, 30, 5);
+    g.fillStyle(0x222222, 1);
+    g.fillCircle(22, 31, 2.4);
+    g.fillCircle(34, 31, 2.4);
+    // base + roof
+    g.fillStyle(0x6b4f2a, 1);
+    g.fillRect(6, 46, 40, 6);
+    g.fillRect(6, 8, 40, 6);
+    g.fillStyle(0x8a5a2a, 1);
+    g.fillTriangle(4, 8, 48, 8, 26, 0);
+    // bars
+    g.fillStyle(0x9aa0ab, 1);
+    for (let x = 10; x <= 42; x += 8) g.fillRect(x, 12, 3, 36);
+    g.lineStyle(3, 0x6b727d, 1);
+    g.strokeRect(7, 12, 38, 36);
+    g.generateTexture(key, S, S);
     g.destroy();
   }
 

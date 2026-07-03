@@ -153,6 +153,12 @@ audio still generated in code, no binary assets.
   crate** — so skilled streaks now pay off in firepower. Boosts are **temporary**
   (timers show as chips under your hearts; longer in Kid Mode), the Shield soaks
   a hit **without breaking your combo**, and the Garage economy stays intact.
+- **Road events:** short "ooh, what's that?" beats punctuate each level. A
+  **💰 Treasure Goblin** sprints through glittering gold — gun it down before it
+  escapes for a big **scrap jackpot** (+ a bonus crate). A **🔒 Caged Critter**
+  drifts by on the road — **shoot the cage** to free it for scrap and a **🍀 Lucky
+  20s** (power-up crates drop more than twice as often). Neither can hurt you —
+  they're pure opportunity.
 - **📻 Bolt's Field Radio:** scrap is now a live resource, not just an
   end-of-level currency. Two buttons (bottom-right) let you spend mid-run:
   **❤ Heal +1 (6 scrap)** or **💥 Damage Boost 15s (10 scrap)** — a real

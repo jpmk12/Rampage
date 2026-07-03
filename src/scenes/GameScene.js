@@ -116,6 +116,8 @@ export default class GameScene extends Phaser.Scene {
     this.shieldBubble = null;
     this.supplyAt = [0.34, 0.67]; // level progress marks for supply drops
     this.supplyIdx = 0;
+    this.eventAt = [0.22, 0.5, 0.8]; // road-event marks (treasure / cage, alternating)
+    this.eventIdx = 0;
     // OVERDRIVE: kills charge the meter; when full, tap/E for a super burst
     this.odCharge = 0; // 0..100
     this.odReady = false;
@@ -692,6 +694,12 @@ export default class GameScene extends Phaser.Scene {
       this.supplyIdx += 1;
       this.startSupplyDrop();
     }
+    if (this.eventIdx < this.eventAt.length && p >= this.eventAt[this.eventIdx]) {
+      const treasure = this.eventIdx % 2 === 0;
+      this.eventIdx += 1;
+      if (treasure) this.spawnTreasureGoblin();
+      else this.spawnCage();
+    }
     if (this.distance >= LEVEL.length) this.startHorde();
   }
 
@@ -808,6 +816,55 @@ export default class GameScene extends Phaser.Scene {
     }
     if (horde) e.setData('horde', true);
     return e;
+  }
+
+  // ---- road events (campaign travel): treasure goblin + caged critter -----
+
+  // A glittering gold goblin that gives a scrap jackpot — but it's tanky and
+  // escapes if it reaches you, so shoot it fast.
+  spawnTreasureGoblin() {
+    const type = {
+      key: 'treasure', tex: 'runner', hp: 6, speed: 250, scrap: 0,
+      lane: 'ground', clearH: 999, scale: 1.3, treasure: true, harmless: true, jackpot: 16,
+    };
+    const e = this.spawnEnemy(type);
+    e.setTint(0xffe14d);
+    e.setData('glitter', true);
+    sound.powerup();
+    this.bannerFlash('💰  TREASURE GOBLIN — shoot it!', '#ffd34d');
+    return e;
+  }
+
+  // A cage that drifts by at road speed; break it to free the critter.
+  spawnCage() {
+    const e = this.goblins.create(GAME_WIDTH + 60, GROUND_TOP_Y + 2, 'cage');
+    e.setOrigin(0.5, 1).setDepth(1);
+    e.body.setAllowGravity(false);
+    e.setVelocityX(-WORLD_SCROLL * 1000); // drifts along with the ground
+    e.setData('type', { key: 'cage', lane: 'ground', clearH: 999, scrap: 0, cage: true, harmless: true });
+    e.setData('hp', 6);
+    e.setData('baseScale', 1);
+    const shadow = this.add.ellipse(e.x, GROUND_TOP_Y + 4, 46, 12, 0x000000, 0.16).setDepth(0);
+    e.setData('shadow', shadow);
+    this.bannerFlash('🔒  Free the critter — shoot the cage!', '#9fe6a0');
+    return e;
+  }
+
+  // Cage broken: the critter hops away happily; you get scrap + a luck boost.
+  freeCritter(x, y) {
+    sound.powerup();
+    this.bannerFlash('🐸  CRITTER FREED!  Lucky!', '#9fe6a0');
+    const c = this.add.image(x, y - 6, 'runner-' + this.levelId).setScale(0.7).setDepth(6);
+    this.tweens.add({ targets: c, x: x - 70, y: y - 90, angle: -20, alpha: 0, duration: 900, ease: 'Quad.easeOut', onComplete: () => c.destroy() });
+    const reward = this.freestyle ? 0 : 8;
+    for (let i = 0; i < reward; i++) this.spawnScrap(x + Phaser.Math.Between(-16, 16), y - 20 + Phaser.Math.Between(-8, 8));
+    if (this.freestyle) {
+      this.score += 4;
+      this.scoreText.setText('SCORE ' + this.score);
+    }
+    // luck: better drop rates for a while
+    this.fx.luck = this.time.now + 20000;
+    this.refreshFxText();
   }
 
   // ---- freestyle bonus round -------------------------------------------
@@ -1206,7 +1263,7 @@ export default class GameScene extends Phaser.Scene {
   refreshFxText() {
     if (!this.fxText) return;
     const now = this.time.now;
-    const icons = { rapid: '⚡', spread: '◣', magnet: '🧲', damage: '💥' };
+    const icons = { rapid: '⚡', spread: '◣', magnet: '🧲', damage: '💥', luck: '🍀' };
     const parts = [];
     for (const k of Object.keys(icons)) {
       const left = (this.fx[k] || 0) - now;
@@ -1556,6 +1613,9 @@ export default class GameScene extends Phaser.Scene {
         }
         // wing flap (fast horizontal squash)
         if (!type.mega) e.setScale(bs * (1 + Math.sin(t * 8) * 0.12), bs * (1 - Math.sin(t * 8) * 0.06));
+      } else if (type.cage) {
+        // cages just drift by (no waddle); glint occasionally
+        if (Math.random() < 0.02) this.spark(e.x - 8 + Math.random() * 16, e.y - 30, 0xdfe9f1);
       } else {
         // a little walking waddle: hop + squash synced to the stride
         const wob = Math.sin(t * 2.4);
@@ -1569,6 +1629,8 @@ export default class GameScene extends Phaser.Scene {
           e.setData('nextLob', time + Phaser.Math.Between(1400, 2400));
         }
         if (type.charges) this.updateCharger(e, time);
+        // treasure goblin sparkles as it runs
+        if (type.treasure && Math.random() < 0.25) this.spark(e.x, e.y - 30 - Math.random() * 20, 0xffe14d);
       }
 
       // contact shadow stays on the ground under the enemy (reads the hop)
@@ -1587,6 +1649,18 @@ export default class GameScene extends Phaser.Scene {
           bar.bg.setPosition(e.x, topY);
           bar.fill.setPosition(e.x - 34, topY);
         }
+      }
+
+      // harmless road-event objects (treasure/cage) never damage — they just
+      // slip past if you don't shoot them in time
+      if (type.harmless) {
+        if (type.treasure && this.state === 'playing' && e.x < this.car.x - 20 && !e.getData('escaped')) {
+          e.setData('escaped', true);
+          this.floatNumber(e.x, e.y - 40, 'got away!', '#bfe6ff', 16);
+          this.poof(e.x, e.y - 24, 0xffe14d);
+        }
+        if (e.x < -90) this.removeEnemy(e);
+        return true;
       }
 
       // reached the car?
@@ -1733,7 +1807,12 @@ export default class GameScene extends Phaser.Scene {
       goblin.setData('hp', hp);
       this.updateMegaBar(goblin);
       goblin.setTintFill(0xffffff);
-      this.time.delayedCall(60, () => goblin.active && goblin.clearTint());
+      this.time.delayedCall(60, () => {
+        if (!goblin.active) return;
+        // treasure goblins keep their gold shimmer after the hit flash
+        if (goblin.getData('type').treasure) goblin.setTint(0xffe14d);
+        else goblin.clearTint();
+      });
       return;
     }
     this.defeatGoblin(goblin);
@@ -1771,6 +1850,13 @@ export default class GameScene extends Phaser.Scene {
     // kills feed the OVERDRIVE meter (streaks and megas feed it faster)
     this.addOdCharge(4 + mult * 2 + (type.mega ? 8 : 0));
 
+    // caged critter: free it for scrap + a luck boost (both modes safe)
+    if (type.cage) {
+      this.freeCritter(gx, yy);
+      this.removeEnemy(goblin);
+      return;
+    }
+
     if (this.freestyle) {
       const gained = (type.mega ? 5 : 1) * mult;
       this.score += gained;
@@ -1783,13 +1869,26 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
+    // treasure goblin: a scrap jackpot + a bonus crate
+    if (type.treasure) {
+      this.bannerFlash('💰  JACKPOT!  💰', '#ffd34d');
+      this.shockRing(gx, yy, 0xffd34d, 100);
+      const jack = type.jackpot || 14;
+      for (let i = 0; i < jack; i++) {
+        this.spawnScrap(gx + Phaser.Math.Between(-20, 20), yy + Phaser.Math.Between(-10, 10));
+      }
+      this.dropTimedCrate(gx, yy - 10);
+      this.removeEnemy(goblin);
+      return;
+    }
+
     // combo makes more loot fly out (capped so it never floods the screen)
     const pieces = Math.min(12, (type.scrap || 1) * mult);
     for (let i = 0; i < pieces; i++) {
       this.spawnScrap(gx + Phaser.Math.Between(-14, 14), yy + Phaser.Math.Between(-8, 8));
     }
-    // campaign enemies occasionally drop a timed power-up crate
-    if (!type.mega && Math.random() < 0.08) this.dropTimedCrate(gx, yy - 10);
+    // campaign enemies occasionally drop a timed power-up crate (luck ups it)
+    if (!type.mega && Math.random() < (this.fxActive('luck') ? 0.2 : 0.08)) this.dropTimedCrate(gx, yy - 10);
     if (mult > 1) this.floatNumber(gx, yy - 20, `x${mult}!`, mult >= 3 ? '#ff8a3a' : '#ffd34d', 22);
     if (goblin.getData('horde')) {
       this.hordeDefeated += 1;

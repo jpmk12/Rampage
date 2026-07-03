@@ -76,6 +76,7 @@ export const ASSETS = [
   { key: 'heart-empty', w: 30, h: 30, anchor: 'center', group: 'Pickups & UI', desc: 'empty health heart' },
   { key: 'crate', w: 30, h: 30, anchor: 'center', tinted: true, group: 'Pickups & UI', desc: 'power-up crate, freestyle + campaign (tinted per pickup — supply white)' },
   { key: 'chute', w: 44, h: 30, anchor: 'center', group: 'Pickups & UI', desc: 'supply-drop parachute canopy (pops on landing)' },
+  { key: 'cage', w: 52, h: 52, anchor: 'bottom', group: 'Pickups & UI', desc: 'road-event cage with a trapped critter — shoot to free' },
   { key: 'flag', w: 76, h: 190, anchor: 'bottom', group: 'Pickups & UI', desc: 'checkered finish flag on a pole' },
   { key: 'axle', w: 56, h: 32, anchor: 'center', group: 'Pickups & UI', desc: 'boss-drop part (shown on victory)' },
   { key: 'bolt', w: 86, h: 76, anchor: 'bottom', group: 'Pickups & UI', facing: 'right', desc: 'Bolt, the Garage robot-dog mechanic' },
