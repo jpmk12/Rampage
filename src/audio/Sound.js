@@ -198,6 +198,12 @@ class Sound {
     this.tone(240, 0.12, 'square', 0.16, 180);
     this.noise(0.08, 0.08);
   }
+  // big rising sweep when OVERDRIVE kicks in
+  overdrive() {
+    this.tone(200, 0.5, 'sawtooth', 0.2, 900);
+    this.tone(400, 0.5, 'square', 0.1, 1400);
+    this.noise(0.3, 0.1);
+  }
   // low menacing horn when a boss rolls in
   bossAppear() {
     this.tone(110, 0.5, 'sawtooth', 0.2, 82);

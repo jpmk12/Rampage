@@ -115,6 +115,11 @@ export default class GameScene extends Phaser.Scene {
     this.shieldBubble = null;
     this.supplyAt = [0.34, 0.67]; // level progress marks for supply drops
     this.supplyIdx = 0;
+    // OVERDRIVE: kills charge the meter; when full, tap/E for a super burst
+    this.odCharge = 0; // 0..100
+    this.odReady = false;
+    this.odActive = false;
+    this.odUntil = 0;
 
     this.spawnGap = Math.max(420, ENEMY.spawnEveryMin - (this.level - 1) * 70);
 
@@ -367,7 +372,7 @@ export default class GameScene extends Phaser.Scene {
 
   buildInput() {
     this.cursors = this.input.keyboard.createCursorKeys();
-    this.keys = this.input.keyboard.addKeys('W,S,R');
+    this.keys = this.input.keyboard.addKeys('W,S,R,E');
     this.jumpKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.input.addPointer(2); // allow two thumbs on a tablet
 
@@ -382,6 +387,7 @@ export default class GameScene extends Phaser.Scene {
 
     this.input.on('pointerdown', (p) => {
       if (this.muteHit(p)) return;
+      if (this.odHit(p)) return;
       if (this.state === 'over') {
         // freestyle shows its own buttons; campaign game-over restarts on tap
         if (this.freestyle) return;
@@ -487,6 +493,22 @@ export default class GameScene extends Phaser.Scene {
       .setDepth(21)
       .setAlpha(0);
 
+    // OVERDRIVE meter (bottom-center): kills charge it; full = tappable button
+    const oy = GAME_HEIGHT - 22;
+    this.odBarBg = this.add
+      .rectangle(GAME_WIDTH / 2, oy, 224, 18, 0x1b1d2a, 0.65)
+      .setStrokeStyle(2, 0x3a3f4a)
+      .setDepth(20);
+    this.odBarFill = this.add
+      .rectangle(GAME_WIDTH / 2 - 108, oy, 0, 10, 0xffd34d, 1)
+      .setOrigin(0, 0.5)
+      .setDepth(21);
+    this.odLabel = this.add
+      .text(GAME_WIDTH / 2, oy, '⚡ OVERDRIVE', { fontFamily: FONTS.ui, fontSize: '13px', color: '#ffffff', stroke: '#1b1d2a', strokeThickness: 3 })
+      .setOrigin(0.5)
+      .setAlpha(0.75)
+      .setDepth(22);
+
     // subtle touch hints
     const hint = { fontFamily: FONTS.ui, fontSize: '13px', color: '#ffffff' };
     this.add.text(20, GAME_HEIGHT - 26, '⤒ tap = jump', hint).setAlpha(0.35).setDepth(20);
@@ -545,8 +567,9 @@ export default class GameScene extends Phaser.Scene {
     sound.setSfxVol(Player.state.sfxVol);
   }
 
-  // 0 normal, 1 boss fight, 2 danger (low health) — drives the music energy
+  // 0 normal, 1 boss fight, 2 danger/overdrive — drives the music energy
   musicIntensity() {
+    if (this.odActive) return 2;
     if (this.health <= 1 && this.state === 'playing' && !Player.state.littleKid) return 2;
     if (this.boss) return 1;
     return 0;
@@ -594,6 +617,7 @@ export default class GameScene extends Phaser.Scene {
       this.emitDust(time);
       if (this.combo > 0 && time > this.comboUntil) this.resetCombo();
       this.updatePowerups(time);
+      this.updateOverdrive(time);
     }
     this.updateClouds(delta);
     this.updateCarPhysics(delta);
@@ -853,10 +877,11 @@ export default class GameScene extends Phaser.Scene {
     const frOver = Math.max(0, (f.fireRate || 0) - FIRE_RATE_CAP);
     let rate = 1 / (1 + 0.14 * frEff);
     if (this.fxActive('rapid')) rate *= 0.55; // timed rapid-fire boost
+    if (this.odActive) rate *= 0.5; // OVERDRIVE goes berserk
     const base = (1 + (f.power || 0)) * (1 + frOver * FIRE_RATE_OVER_DMG);
     let fired = false;
 
-    const gN = this.fsCount('guns') + (this.fxActive('spread') ? 2 : 0);
+    const gN = this.fsCount('guns') + (this.fxActive('spread') || this.odActive ? 2 : 0);
     if (gN > 0 && time - (this.tGun || 0) > 170 * rate) {
       this.tGun = time;
       const dmg = base * this.fsBoost('guns');
@@ -1186,6 +1211,120 @@ export default class GameScene extends Phaser.Scene {
     }
     if (this.shieldHits > 0) parts.push('🛡');
     this.fxText.setText(parts.join('   '));
+  }
+
+  // ---- OVERDRIVE ----------------------------------------------------------
+
+  // Kills feed the meter (combo kills feed it faster; quicker in Kid Mode).
+  addOdCharge(n) {
+    if (this.odActive || this.odReady) return;
+    const kid = Player.state.littleKid ? 1.4 : 1;
+    this.odCharge = Math.min(100, this.odCharge + n * kid);
+    if (this.odCharge >= 100) {
+      this.odReady = true;
+      sound.powerup();
+      this.floatLabel(this.car.x, this.car.y - 120, 'OVERDRIVE READY!', '#ffd34d');
+      this.odLabel.setText('⚡ TAP FOR OVERDRIVE! ⚡').setAlpha(1).setColor('#1b1d2a');
+      this.odPulse = this.tweens.add({
+        targets: [this.odBarBg, this.odBarFill, this.odLabel],
+        scaleX: 1.06,
+        scaleY: 1.12,
+        duration: 360,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+    }
+  }
+
+  // True if the pointer landed on the (ready) OVERDRIVE button.
+  odHit(p) {
+    if (!this.odReady || this.state !== 'playing') return false;
+    const b = this.odBarBg;
+    if (Math.abs(p.x - b.x) > 130 || Math.abs(p.y - b.y) > 26) return false;
+    this.activateOverdrive();
+    return true;
+  }
+
+  activateOverdrive() {
+    if (!this.odReady || this.odActive || this.state !== 'playing') return;
+    this.odReady = false;
+    this.odActive = true;
+    this.odUntil = this.time.now + 6000;
+    this.odCharge = 100; // drains visually over the duration
+    if (this.odPulse) {
+      this.odPulse.stop();
+      this.odPulse = null;
+      [this.odBarBg, this.odBarFill, this.odLabel].forEach((o) => o.setScale(1));
+    }
+    this.odLabel.setText('⚡ OVERDRIVE!! ⚡').setColor('#1b1d2a');
+
+    sound.overdrive();
+    this.bannerFlash('⚡ OVERDRIVE!! ⚡', '#ffd34d');
+    this.cameras.main.flash(160, 255, 220, 120);
+    this.cameras.main.shake(200, 0.006);
+    this.shockRing(this.car.x, this.carCenterY(), 0xffd34d, 130, 420);
+
+    // golden glow that rides with the car while it lasts
+    this.odGlow = this.add
+      .circle(this.car.x, this.carCenterY(), 74, 0xffd34d, 0.16)
+      .setStrokeStyle(3, 0xffd34d, 0.85)
+      .setDepth(4);
+    this.refreshIntensity();
+  }
+
+  endOverdrive() {
+    this.odActive = false;
+    this.odCharge = 0;
+    this.odLabel.setText('⚡ OVERDRIVE').setColor('#ffffff').setAlpha(0.75);
+    if (this.odGlow) {
+      this.odGlow.destroy();
+      this.odGlow = null;
+    }
+    this.refreshIntensity();
+  }
+
+  updateOverdrive(time) {
+    // keyboard activation
+    if (this.keys.E && Phaser.Input.Keyboard.JustDown(this.keys.E)) this.activateOverdrive();
+
+    if (this.odActive) {
+      if (time >= this.odUntil) {
+        this.endOverdrive();
+      } else {
+        // glow pulses along, meter drains with time remaining
+        const left = (this.odUntil - time) / 6000;
+        this.odCharge = 100 * left;
+        if (this.odGlow) {
+          this.odGlow.setPosition(this.car.x, this.carCenterY());
+          const pulse = 1 + Math.sin(time * 0.02) * 0.08;
+          this.odGlow.setScale(pulse);
+        }
+        this.odVolley(time);
+      }
+    }
+
+    // meter render
+    const frac = Phaser.Math.Clamp(this.odCharge / 100, 0, 1);
+    this.odBarFill.width = 216 * frac;
+    this.odBarFill.setFillStyle(this.odActive ? 0xff8a3a : this.odReady ? 0xffd34d : 0xd4a017);
+  }
+
+  // The OVERDRIVE gun: a fast golden fan on top of the normal weapons.
+  odVolley(time) {
+    if (time < (this.odNextShot || 0)) return;
+    this.odNextShot = time + 150;
+    const dmg = this.freestyle ? 2 + Math.floor(this.fsPower() * 0.15) : Math.max(2, this.weapon.damage);
+    for (const off of [-0.18, 0, 0.18]) {
+      const a = this.aim + off;
+      const b = this.bullets.create(this.car.x + 44, this.car.y - 56, 'shot-crossbow');
+      if (!b) continue;
+      b.body.setAllowGravity(false);
+      b.setRotation(a).setScale(1.25).setTint(0xffd34d).setDepth(4);
+      b.setVelocity(Math.cos(a) * 920, Math.sin(a) * 920);
+      b.setData('dmg', dmg);
+    }
+    this.muzzleFlash(this.car.x + 48, this.car.y - 52, 0.8);
   }
 
   floatLabel(x, y, text, color) {
@@ -1557,6 +1696,9 @@ export default class GameScene extends Phaser.Scene {
       this.floatNumber(gx, yy - 44, 'MEGA COMBO PRIZE!', '#ff8a3a', 16);
     }
 
+    // kills feed the OVERDRIVE meter (streaks and megas feed it faster)
+    this.addOdCharge(4 + mult * 2 + (type.mega ? 8 : 0));
+
     if (this.freestyle) {
       const gained = (type.mega ? 5 : 1) * mult;
       this.score += gained;
@@ -1640,6 +1782,12 @@ export default class GameScene extends Phaser.Scene {
   damageCar(amount) {
     if (this.state !== 'playing') return;
     if (this.time.now < this.invulnUntil) return;
+
+    // nothing stops OVERDRIVE — plow right through
+    if (this.odActive) {
+      this.poof(this.car.x + 20, this.carCenterY(), 0xffd34d);
+      return;
+    }
 
     this.invulnUntil = this.time.now + COMBAT.invuln;
     sound.hurt();
@@ -2036,6 +2184,7 @@ export default class GameScene extends Phaser.Scene {
     this.boss = null;
     this.hideBossBar();
     this.refreshIntensity();
+    this.addOdCharge(30);
     sound.explode();
     // a punchy multi-ring blast + white camera flash to sell the kill
     this.shockRing(bx, by, 0xfff2b0, 150, 420);
@@ -2201,8 +2350,8 @@ export default class GameScene extends Phaser.Scene {
   // ---- shooting ---------------------------------------------------------
 
   handleFiring(time) {
-    // rapid-fire power-up more than doubles the fire rate
-    const cd = this.weapon.cooldown * (this.fxActive('rapid') ? 0.45 : 1);
+    // rapid-fire power-up (or OVERDRIVE) more than doubles the fire rate
+    const cd = this.weapon.cooldown * (this.odActive ? 0.35 : this.fxActive('rapid') ? 0.45 : 1);
     if (time - this.lastFireAt < cd) return;
     this.lastFireAt = time;
 
@@ -2211,7 +2360,7 @@ export default class GameScene extends Phaser.Scene {
     const my = this.car.y + m.y;
 
     this.firePlayerShot(mx, my, this.aim);
-    if (this.fxActive('spread')) {
+    if (this.fxActive('spread') || this.odActive) {
       // triple-shot power-up fans two extra shots
       this.firePlayerShot(mx, my, this.aim - 0.16);
       this.firePlayerShot(mx, my, this.aim + 0.16);

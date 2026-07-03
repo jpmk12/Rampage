@@ -153,6 +153,12 @@ audio still generated in code, no binary assets.
   crate** — so skilled streaks now pay off in firepower. Boosts are **temporary**
   (timers show as chips under your hearts; longer in Kid Mode), the Shield soaks
   a hit **without breaking your combo**, and the Garage economy stays intact.
+- **⚡ OVERDRIVE:** every defeat charges the meter at the bottom of the screen
+  (streaks, megas, and bosses charge it faster). When it's full, **tap it (or
+  press E)** to erupt for six seconds: invincible, guns at maximum speed, and a
+  golden triple-fan blasting on top — with the music surging to match. It's
+  yours to spend: pop it to escape trouble, shred a horde, or **save it for the
+  boss**.
 - **Dynamic audio:** every biome has its **own music theme** (bright Greenwood,
   spooky Zombie Flats, western Badlands, airy Frost, driving Volcano, plus a
   party track for Freestyle), now with a **drum groove** that **ramps up for
