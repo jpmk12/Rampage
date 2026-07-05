@@ -26,7 +26,7 @@ export const ASSET_OVERRIDES = {
   'body-cardboard': 'body-cardboard.png',
   'body-wood': 'body-wood.png',
   'body-iron': 'body-iron.png',
-  // 'body-armored': 'body-armored.png',
+  'body-armored': 'body-armored.png',
   // 'body-tank': 'body-tank.png',
 
   // ---- Weapons (mount by left-center) · Player shots -----------------------
