@@ -1,4 +1,5 @@
 import { getBody, getWeapon } from '../data/catalog.js';
+import { ASSET_OVERRIDES } from '../data/assets.js';
 
 // Bolt-on turrets stack vertically into a tower on the roof (relative to the
 // bottom-center origin). The segments are flat-topped so they sit flush; the
@@ -23,13 +24,18 @@ export function buildCar(scene, x, y, bodyId, weaponId, turrets = 0) {
   const bodySprite = scene.add.image(0, 0, `body-${body.id}`).setOrigin(0.5, 1);
   container.add(bodySprite);
 
-  // spinning wheels overlaid on top of the baked wheels (rotated by the scene)
+  // spinning wheels overlaid on top of the baked wheels (rotated by the scene).
+  // Custom body art draws its own wheels, so skip the overlay for overridden
+  // bodies to avoid double/misaligned wheels.
   const wheels = [];
-  (body.wheels || []).forEach((w) => {
-    const ws = scene.add.image(w.x, w.y, 'wheel-spin').setOrigin(0.5).setScale(w.r / 18);
-    container.add(ws);
-    wheels.push(ws);
-  });
+  const customBody = !!ASSET_OVERRIDES[`body-${body.id}`];
+  if (!customBody) {
+    (body.wheels || []).forEach((w) => {
+      const ws = scene.add.image(w.x, w.y, 'wheel-spin').setOrigin(0.5).setScale(w.r / 18);
+      container.add(ws);
+      wheels.push(ws);
+    });
+  }
 
   const weaponSprite = scene.add
     .image(body.mount.x, body.mount.y, `wpn-${weapon.id}`)
