@@ -24,7 +24,7 @@
 export const ASSET_OVERRIDES = {
   // ---- Cars — 124x92, wheels on the bottom edge, facing right --------------
   'body-cardboard': 'body-cardboard.png',
-  // 'body-wood': 'body-wood.png',
+  'body-wood': 'body-wood.png',
   // 'body-iron': 'body-iron.png',
   // 'body-armored': 'body-armored.png',
   // 'body-tank': 'body-tank.png',
